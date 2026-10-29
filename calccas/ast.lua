@@ -224,6 +224,26 @@ local function children(node)
     return {}
 end
 
+-- Replaces every variable named `name` with `replacement`, rebuilding through the
+-- constructors so the canonical invariants hold.
+function M.substitute(node, name, replacement)
+    local t = node.t
+    if t == "var" then
+        return node.name == name and replacement or node
+    elseif t == "add" or t == "mul" then
+        local args = {}
+        for i, a in ipairs(node.args) do
+            args[i] = M.substitute(a, name, replacement)
+        end
+        return t == "add" and M.add(args) or M.mul(args)
+    elseif t == "pow" then
+        return M.pow(M.substitute(node.base, name, replacement), M.substitute(node.exp, name, replacement))
+    elseif t == "fn" then
+        return M.fn(node.name, M.substitute(node.arg, name, replacement))
+    end
+    return node
+end
+
 function M.count(node)
     local total = 1
     for _, child in ipairs(children(node)) do

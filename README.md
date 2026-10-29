@@ -27,7 +27,7 @@ Minimum KOReader version: **v2025.10 (provisional)**. The APIs used were checked
 ```sh
 export PATH=$HOME/.luarocks-luajit/bin:$PATH
 busted                  # engine tests
-luacheck main.lua _meta.lua calccas calcplot calcui spec
+luacheck main.lua _meta.lua calccas calcplot calcnb calcui spec
 ```
 
 Engine modules (`calccas/`, `calcplot/`) do not require KOReader; UI code lives in `calcui/` and `main.lua`.

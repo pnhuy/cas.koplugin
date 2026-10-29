@@ -23,16 +23,27 @@ local function guard(fn)
 end
 
 -- Accepts expression text or an already parsed AST.
-local function as_ast(input)
+local function as_ast(input, user_funcs)
     if type(input) == "table" and input.t then
         return input
     end
-    return parser.parse(input)
+    return parser.parse(input, user_funcs and { user_funcs = user_funcs } or nil)
 end
 
-M.parse = guard(function(text)
-    return parser.parse(text)
+-- `overrides` is passed to the parser (limits, `user_funcs`).
+M.parse = guard(function(text, overrides)
+    return parser.parse(text, overrides)
 end)
+
+-- Sorted names of the supported built-in functions.
+function M.functions()
+    local names = {}
+    for name in pairs(FUNCTION_NAMES) do
+        names[#names + 1] = name
+    end
+    table.sort(names)
+    return names
+end
 
 local function symbolic_result(node, notes)
     return {
@@ -43,16 +54,16 @@ local function symbolic_result(node, notes)
     }
 end
 
-M.simplify = guard(function(input)
-    local node, err = as_ast(input)
+M.simplify = guard(function(input, user_funcs)
+    local node, err = as_ast(input, user_funcs)
     if not node then
         return nil, err
     end
     return symbolic_result(simplifier.simplify(node))
 end)
 
-M.expand = guard(function(input)
-    local node, err = as_ast(input)
+M.expand = guard(function(input, user_funcs)
+    local node, err = as_ast(input, user_funcs)
     if not node then
         return nil, err
     end
@@ -91,12 +102,13 @@ local function split_wrapper(text)
     return nil
 end
 
-M.evaluate = guard(function(input, vars)
+-- `user_funcs` (optional): name -> `{param, body}` callable as `name(arg)`.
+M.evaluate = guard(function(input, vars, user_funcs)
     local wrapper, inner = split_wrapper(input)
     if wrapper then
-        return M[wrapper](inner)
+        return M[wrapper](inner, user_funcs)
     end
-    local node, err = as_ast(input)
+    local node, err = as_ast(input, user_funcs)
     if not node then
         return nil, err
     end

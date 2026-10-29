@@ -104,6 +104,17 @@ local function parse_tokens(tokens, lim)
                 expect_rparen()
                 return ast.fn(fname, arg)
             end
+            local user = nxt.type == "lparen" and lim.user_funcs and lim.user_funcs[tok.text]
+            if user then
+                advance()
+                local arg = parse_expr()
+                expect_rparen()
+                local call = ast.substitute(user.body, user.param, arg)
+                if ast.count(call) > lim.max_nodes then
+                    fail("too_complex", "expression has too many parts", tok.pos)
+                end
+                return call
+            end
             if nxt.type == "lparen" then
                 fail("syntax", "unknown function '" .. tok.text .. "'", tok.pos)
             end
@@ -202,7 +213,8 @@ local function parse_tokens(tokens, lim)
 end
 
 -- `overrides` may replace individual limits (used by tests and callers that
--- need tighter bounds).
+-- need tighter bounds). `overrides.user_funcs` maps a name to `{param, body}`;
+-- a call `name(arg)` then parses to `body` with `param` replaced by `arg`.
 function M.parse(text, overrides)
     if type(text) ~= "string" then
         return nil, errors.new("syntax", "expression must be text")

@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/001-calculator-cas-graphing/plan.md
+specs/002-notebook-ui-keyboard/plan.md
 <!-- SPECKIT END -->
