@@ -1,0 +1,86 @@
+local outcome = require("calcui.outcome")
+
+describe("calcui.outcome.evaluate", function()
+    it("returns the result text on success", function()
+        local o = outcome.evaluate("1/3+1/6", "")
+        assert.is_true(o.ok)
+        assert.equals("1/2", o.text)
+    end)
+
+    it("uses variable assignments", function()
+        local o = outcome.evaluate("x^2+y", "x=3, y=1")
+        assert.is_true(o.ok)
+        assert.equals("10", o.text)
+    end)
+
+    it("shows the unbound variable expression symbolically", function()
+        local o = outcome.evaluate("2*x+x", "")
+        assert.is_true(o.ok)
+        assert.is_truthy(o.text:find("x", 1, true))
+    end)
+
+    it("reports a syntax error with a caret under the position", function()
+        local o = outcome.evaluate("2 +* 3", "")
+        assert.is_false(o.ok)
+        assert.equals(4, o.pos)
+        assert.is_truthy(o.text:find("2 +* 3\n   ^", 1, true))
+    end)
+
+    it("reports math errors without a caret", function()
+        local o = outcome.evaluate("1/0", "")
+        assert.is_false(o.ok)
+        assert.is_nil(o.pos)
+        assert.is_truthy(o.text:lower():find("zero", 1, true))
+    end)
+
+    it("reports bad variable assignments", function()
+        local o = outcome.evaluate("x", "x=")
+        assert.is_false(o.ok)
+    end)
+
+    it("handles an empty expression", function()
+        local o = outcome.evaluate("  ", "")
+        assert.is_false(o.ok)
+    end)
+
+    it("applies the translate function to messages", function()
+        local o = outcome.evaluate("1/0", "", function(s) return "T:" .. s end)
+        assert.is_truthy(o.text:find("T:", 1, true))
+    end)
+
+    it("never throws on odd input", function()
+        for _, s in ipairs({ "os.execute('x')", "((((", "\0", string.rep("9", 600) }) do
+            local o = outcome.evaluate(s, "")
+            assert.is_false(o.ok)
+        end
+    end)
+end)
+
+describe("calcui.outcome.simplify", function()
+    it("returns the simplified text", function()
+        local o = outcome.simplify("2*x+3*x")
+        assert.is_true(o.ok)
+        assert.equals("5*x", o.text)
+    end)
+
+    it("lists assumptions under the result", function()
+        local o = outcome.simplify("x/x")
+        assert.is_true(o.ok)
+        assert.equals("x/x\nAssuming: x ≠ 0", o.text)
+    end)
+
+    it("translates the assumptions label", function()
+        local o = outcome.simplify("x/x", function(s) return "T:" .. s end)
+        assert.is_truthy(o.text:find("T:Assuming", 1, true))
+    end)
+
+    it("reports syntax errors with a caret", function()
+        local o = outcome.simplify("2 +* 3")
+        assert.is_false(o.ok)
+        assert.equals(4, o.pos)
+    end)
+
+    it("rejects an empty expression", function()
+        assert.is_false(outcome.simplify("").ok)
+    end)
+end)

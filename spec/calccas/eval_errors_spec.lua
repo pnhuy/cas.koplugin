@@ -1,0 +1,62 @@
+local parser = require("calccas.parser")
+local eval = require("calccas.eval")
+
+local function kind_of(text, vars)
+  local node = assert(parser.parse(text))
+  local res, err = eval.evaluate(node, vars)
+  assert.is_nil(res, text .. " should fail")
+  assert.is_table(err)
+  return err.kind
+end
+
+describe("calccas.eval math errors", function()
+  it("division by zero", function()
+    assert.are.equal("div_by_zero", kind_of("1/0"))
+    assert.are.equal("div_by_zero", kind_of("1/(1-1)"))
+    assert.are.equal("div_by_zero", kind_of("0^-1"))
+    assert.are.equal("div_by_zero", kind_of("0^(-1/2)"))
+    assert.are.equal("div_by_zero", kind_of("1/x", { x = 0 }))
+  end)
+
+  it("is detected even when other variables stay free", function()
+    assert.are.equal("div_by_zero", kind_of("y/0"))
+  end)
+
+  it("0^0 is undefined", function()
+    assert.are.equal("undefined", kind_of("0^0"))
+  end)
+
+  it("domain errors", function()
+    assert.are.equal("domain", kind_of("sqrt(-1)"))
+    assert.are.equal("domain", kind_of("log(0)"))
+    assert.are.equal("domain", kind_of("log(-2)"))
+    assert.are.equal("domain", kind_of("ln(-0.5)"))
+    assert.are.equal("domain", kind_of("tan(pi/2)"))
+    assert.are.equal("domain", kind_of("(-1)^0.5"))
+    assert.are.equal("domain", kind_of("(-8)^(1/3)"))
+    assert.are.equal("domain", kind_of("sqrt(-2.5)"))
+  end)
+
+  it("overflow", function()
+    assert.are.equal("overflow", kind_of("10^1000"))
+    assert.are.equal("overflow", kind_of("exp(1000)"))
+    assert.are.equal("overflow", kind_of("2^1024"))
+    assert.are.equal("overflow", kind_of("1" .. string.rep("0", 240) .. " * 1" .. string.rep("0", 240)))
+  end)
+
+  it("9^9^9 fails fast instead of hanging", function()
+    local started = os.clock()
+    assert.are.equal("overflow", kind_of("9^9^9"))
+    assert.is_true(os.clock() - started < 0.5)
+  end)
+
+  it("exponent towers fail fast", function()
+    local started = os.clock()
+    assert.are.equal("overflow", kind_of("2^2^2^2^2^2"))
+    assert.is_true(os.clock() - started < 0.5)
+  end)
+
+  it("a domain error inside a larger expression propagates", function()
+    assert.are.equal("domain", kind_of("1 + 2*sqrt(-1)"))
+  end)
+end)
