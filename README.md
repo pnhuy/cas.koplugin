@@ -34,19 +34,26 @@ Minimum KOReader version: **v2025.10 (provisional)**. The APIs used were checked
 
 ## Language
 
-- Numbers: `3`, `2.5`, `.5`. Operators: `+ - * / ^` and parentheses. `^` is right-associative and binds tighter
+The full definition is the versioned [language reference](docs/language/reference-1.0.md) (language 1.0), with the
+[grammar](docs/language/grammar.md), the [error catalog](docs/language/errors.md) and the list of
+[future features](docs/language/future.md).
+
+- Numbers: `3`, `2.5`, `.5`, `1e3` (exact: `1e-3` is `1/1000`). Operators: `+ - * / ^` and parentheses. `^` is right-associative and binds tighter
   than unary minus: `-2^2 = -4`, `2^3^2 = 512`.
-- Implicit multiplication: `2x`, `2(x+1)`, `(x+1)(x-1)`. `1/2x` means `(1/2)*x`.
-- Assignment `a = 2`; function definition `f(x) = x^2 + a`; several statements per cell, one per line.
+- Multiplication is always written `*`: `2*x`, `2*(x+1)`, `(x+1)*(x-1)`. `2x` is an error that shows the fix.
+- Assignment `a = 2`; function definition `f(x) = x^2 + a`; equation `x^2 == 4` (shown, not evaluated); `#` starts a
+  comment; several statements per cell, one per line, and a line ending in an operator or comma, or inside brackets,
+  continues.
 - Functions: `sin cos tan exp log ln sqrt abs`, `simplify`, `expand`, `plot`. Constants: `pi`, `e`. These names
-  are reserved.
+  are reserved, as are the future commands `diff solve factor integrate subs approx`. The keyboard offers exactly the
+  implemented names of the function registry.
 - Input is parsed, never executed as Lua. Limits: 500 characters per expression, nesting depth 50, 2000 nodes,
   200 cells, 5000 characters per cell.
 
 ### Not supported
 
-`diff`, `solve`, `factor`, `integrate`, `limit`, `asin`/`acos`/`atan`, relations and equations as values,
-`plot2`, parametric and polar plots. These do not appear as keyboard shortcuts.
+`diff`, `solve`, `factor`, `integrate`, `subs`, `approx` (reserved: they report an error), `limit`,
+`asin`/`acos`/`atan`, comparison operators, `plot2`, parametric and polar plots. These do not appear as keyboard shortcuts.
 
 ## Saved data
 

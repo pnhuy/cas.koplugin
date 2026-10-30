@@ -1,159 +1,103 @@
 -- Splits a notebook cell into statements (see contracts/notebook-language.md).
--- Pure text classification; nothing is ever passed to load/loadstring.
+-- An adapter over the language parser (`calccas.parse_program`): the grammar
+-- lives there, this module only shapes each statement for the runner. Nothing
+-- is ever passed to load/loadstring.
 
-local limits = require("calccas.limits")
+local calccas = require("calccas")
+local errors = require("calccas.errors")
+local registry = require("calccas.registry")
 
 local M = {}
 
 local MAX_NAME = 32
-local RESERVED = {
-    sin = true, cos = true, tan = true, exp = true, log = true, ln = true, sqrt = true, abs = true,
-    pi = true, e = true, plot = true, simplify = true, expand = true,
-}
+local RESERVED = registry.reserved_set()
 
 M.RESERVED = RESERVED
 M.MAX_NAME = MAX_NAME
 
-local function fail(kind, message, line)
-    return nil, { kind = kind, message = message, line = line }
+local function range_error(line)
+    local err = errors.new("range", "Invalid range")
+    err.line = line
+    return err
 end
 
-local function trim(s)
-    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
-end
-
--- Returns true, or false plus an error kind and message.
-local function check_name(name)
-    if not name:match("^[A-Za-z][A-Za-z0-9_]*$") then
-        return false, "name", "Invalid name"
-    elseif #name > MAX_NAME then
-        return false, "name", "Name is longer than " .. MAX_NAME .. " characters"
-    elseif RESERVED[name] then
-        return false, "reserved", "Name is reserved"
+-- The numeric value of a constant range bound, or nil.
+local function bound_value(node)
+    local result = calccas.evaluate(node, {})
+    local v = result and #result.free == 0 and result.value
+    if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then
+        return v
     end
-    return true
+    return nil
 end
 
--- Splits on commas that are not inside brackets.
-local function split_args(text)
-    local args, depth, start = {}, 0, 1
-    for i = 1, #text do
-        local c = text:sub(i, i)
-        if c == "(" then
-            depth = depth + 1
-        elseif c == ")" then
-            depth = depth - 1
-        elseif c == "," and depth == 0 then
-            args[#args + 1] = trim(text:sub(start, i - 1))
-            start = i + 1
-        end
-    end
-    args[#args + 1] = trim(text:sub(start))
-    return args
-end
-
-local function plot_statement(inner, line)
-    local args = split_args(inner)
+local function plot_record(stmt)
+    local node = stmt.node
+    local args, srcs = {}, {}
     local range
-    local lo, hi = args[#args]:match("^x%s*=%s*(.-)%.%.(.*)$")
-    if lo then
-        args[#args] = nil
-        lo, hi = trim(lo), trim(hi)
-        -- Bounds are plain numbers; the order is checked here, evaluation
-        -- of the functions happens in the runner.
-        local a, b = tonumber(lo), tonumber(hi)
-        if not (a and b and a == a and b == b and a < b) then
-            return fail("range", "Invalid range", line)
-        end
-        range = { lo = lo, hi = hi }
-    end
-    if #args == 0 or args[1] == "" then
-        return fail("syntax", "plot needs at least one function", line)
-    end
-    for _, a in ipairs(args) do
-        if a == "" then
-            return fail("syntax", "empty plot argument", line)
-        end
-    end
-    if #args > limits.max_functions then
-        return fail("too_complex", "plot takes at most " .. limits.max_functions .. " functions", line)
-    end
-    return { kind = "plot", args = args, range = range, line = line }
-end
-
-local function classify(text, line)
-    local inner = text:match("^plot%s*%((.*)%)$")
-    if inner then
-        return plot_statement(inner, line)
-    end
-
-    local fname, param, body = text:match("^([%a][%w_]*)%s*%(%s*([%a][%w_]*)%s*%)%s*=([^=].*)$")
-    if not fname then
-        fname, param = text:match("^([%a][%w_]*)%s*%(%s*([%a][%w_]*)%s*%)%s*=$")
-        body = ""
-    end
-    if fname then
-        local ok, kind, message = check_name(fname)
-        if not ok then
-            return fail(kind, message, line)
-        end
-        local pok, pkind, pmessage = check_name(param)
-        if not pok and pkind ~= "reserved" then
-            return fail(pkind, pmessage, line)
-        end
-        body = trim(body)
-        if body == "" then
-            return fail("syntax", "expected an expression after '='", line)
-        end
-        return { kind = "funcdef", name = fname, param = param, text = body, line = line }
-    end
-
-    local name, rhs = text:match("^([%w_]+)%s*=([^=].*)$")
-    if not name then
-        name = text:match("^([%w_]+)%s*=$")
-        rhs = ""
-    end
-    if name then
-        local ok, kind, message = check_name(name)
-        if not ok then
-            return fail(kind, message, line)
-        end
-        rhs = trim(rhs)
-        if rhs == "" then
-            return fail("syntax", "expected an expression after '='", line)
-        end
-        return { kind = "assign", name = name, text = rhs, line = line }
-    end
-
-    -- "sin(x) = 1" style definitions of reserved names.
-    local rname = text:match("^([%a][%w_]*)%s*%([^()]*%)%s*=[^=]")
-    if rname then
-        local _, kind, message = check_name(rname)
-        if kind then
-            return fail(kind, message, line)
-        end
-    end
-
-    return { kind = "expr", text = text, line = line }
-end
-
--- Returns a list of statements or `nil, {kind, message, line}`.
-function M.parse(source)
-    local list = {}
-    local line = 0
-    for raw in (source .. "\n"):gmatch("([^\n]*)\n") do
-        line = line + 1
-        local text = trim(raw)
-        if text ~= "" and text:sub(1, 1) ~= "#" then
-            if #text > limits.max_chars then
-                return fail("too_complex", "Statement is longer than " .. limits.max_chars .. " characters", line)
+    for i, a in ipairs(node.args) do
+        if a.t == "range" then
+            local lo, hi = bound_value(a.lo), bound_value(a.hi)
+            if not (lo and hi and lo < hi) then
+                return nil, range_error(stmt.line)
             end
-            local stmt, err = classify(text, line)
-            if not stmt then
+            range = { lo = lo, hi = hi }
+        else
+            args[#args + 1] = a
+            srcs[#srcs + 1] = stmt.arg_srcs and stmt.arg_srcs[i] or calccas.tostring(a)
+        end
+    end
+    if #args == 0 then
+        local err = errors.new("syntax", "plot needs at least one function")
+        err.line = stmt.line
+        return nil, err
+    end
+    return { kind = "plot", args = srcs, arg_nodes = args, range = range, line = stmt.line }
+end
+
+local function record(stmt)
+    local node = stmt.node
+    if node.t == "assign" then
+        return { kind = "assign", name = node.name, text = stmt.rhs_src, node = node.value, line = stmt.line }
+    elseif node.t == "funcdef" then
+        return {
+            kind = "funcdef", name = node.name, param = node.params[1], params = node.params,
+            text = stmt.rhs_src, node = node.body, line = stmt.line,
+        }
+    elseif node.t == "call" and node.name == "plot" then
+        return plot_record(stmt)
+    end
+    return { kind = "expr", text = stmt.src, node = node, line = stmt.line }
+end
+
+-- Returns a list of statements, or `nil, err` for the first bad statement
+-- (`err.line` is its line). With `opts.lazy` a bad statement becomes
+-- `{kind = "error", err = err, line = line}` in the list instead, so the
+-- statements before it still run. `opts.env` supplies the known variables and
+-- functions.
+function M.parse(source, opts)
+    local env = opts and opts.env
+    local lazy = opts and opts.lazy
+    local parsed, perr = calccas.parse_program(source, env and { user_funcs = env.funcs, vars = env.vars } or nil)
+    if not parsed then
+        return nil, perr
+    end
+    local list = {}
+    for _, stmt in ipairs(parsed) do
+        local rec, err
+        if stmt.err then
+            err = stmt.err
+        else
+            rec, err = record(stmt)
+        end
+        if err then
+            err.line = err.line or stmt.line
+            if not lazy then
                 return nil, err
             end
-            list[#list + 1] = stmt
+            rec = { kind = "error", err = err, line = err.line }
         end
+        list[#list + 1] = rec
     end
     return list
 end

@@ -41,6 +41,13 @@ local function collect(node, seen)
         collect(node.exp, seen)
     elseif t == "fn" then
         collect(node.arg, seen)
+    elseif t == "rel" then
+        collect(node.lhs, seen)
+        collect(node.rhs, seen)
+    elseif t == "call" then
+        for _, a in ipairs(node.args) do
+            collect(a, seen)
+        end
     end
 end
 
@@ -314,6 +321,7 @@ local FUNCTIONS = {
     end,
     abs = function(a) return abs(a) end,
 }
+M.IMPLEMENTATIONS = FUNCTIONS
 
 -- Returns a number, or nil plus an error kind and message. env maps variable
 -- names to floats.
@@ -373,6 +381,35 @@ end
 
 ---------------------------------------------------------------- public
 
+local STATEMENT = { call = true, range = true, assign = true, funcdef = true }
+
+local function has_statement(node)
+    if STATEMENT[node.t] then
+        return true
+    end
+    for _, child in ipairs(ast.children(node)) do
+        if has_statement(child) then
+            return true
+        end
+    end
+    return false
+end
+
+-- A relation is never reduced to true or false: each side is evaluated and
+-- the result is the relation of the two sides.
+function M.evaluate_relation(node, env)
+    local sides = {}
+    for k, side in ipairs({ node.lhs, node.rhs }) do
+        local r, err = M.evaluate(side, env)
+        if not r then
+            return nil, err
+        end
+        sides[k] = r.exact or ast.float(r.value)
+    end
+    local rel = ast.rel(node.op, sides[1], sides[2])
+    return { exact = rel, assumptions = {}, free = M.free_vars(rel) }
+end
+
 -- Result: { exact = AST?, value = number?, assumptions = {}, free = {names} }
 -- With free variables the result is symbolic (value is nil); otherwise value
 -- is always set.
@@ -380,6 +417,11 @@ function M.evaluate(node, vars)
     local env, err = M.bind(vars)
     if not env then
         return nil, err
+    end
+    if node.t == "rel" then
+        return M.evaluate_relation(node, env)
+    elseif has_statement(node) then
+        return nil, errors.new("unsupported", "a command or statement cannot be used inside an expression")
     end
     local reduced, rerr = M.reduce(node, env)
     if not reduced then
@@ -399,6 +441,9 @@ end
 
 -- Returns f(x) -> number | nil (nil = undefined at x), never raising.
 function M.compile(node, varname)
+    if node.t == "rel" or node.t == "call" or node.t == "range" then
+        return nil, errors.new("unsupported", "cannot plot an equation or command")
+    end
     for _, name in ipairs(M.free_vars(node)) do
         if name ~= varname then
             return nil, errors.new("unbound_variable", "unknown variable '" .. name .. "'")

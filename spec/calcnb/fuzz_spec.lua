@@ -65,3 +65,67 @@ describe("typing never evaluates", function()
         assert.are.equal(0, nb.exec_counter)
     end)
 end)
+
+describe("input never reaches a Lua loader or the system", function()
+    local runner = require("calcnb.runner")
+    local env_mod = require("calcnb.env")
+    local suite = require("spec.calccas.conformance_cases")
+
+    local PIECES = {
+        "1", "2.5", "1e3", "1e-3", "x", "y", "f", "pi", "e", "sin(", "plot(", "diff(", "(", ")", ",", "+", "-", "*", "/", "^",
+        "=", "==", "..", "#", "\n", " ", "x=-5..5", "f(x) = ", "os.execute(", "load(", "$", "2x", "1e999",
+    }
+
+    it("calls none of load, loadstring, dofile, require, os.execute or io.open over 200 edits and the hostile list", function()
+        runner.run("1", env_mod.new()) -- load every module before the stubs go in
+        runner.run("plot(sin(x))", env_mod.new())
+        local names = { "load", "loadstring", "dofile", "require" }
+        local saved, calls = {}, 0
+        local function stub()
+            calls = calls + 1
+            error("forbidden call from user input")
+        end
+        for _, name in ipairs(names) do
+            saved[name] = _G[name]
+            _G[name] = stub
+        end
+        local function set(tbl, key, value)
+            tbl[key] = value
+        end
+        local real_execute, real_open = os.execute, io.open
+        set(os, "execute", stub)
+        set(io, "open", stub)
+
+        local ok, err = pcall(function()
+            math.randomseed(2026)
+            local text = ""
+            for _ = 1, 200 do
+                local op = math.random(3)
+                if op == 1 or #text == 0 then
+                    text = text .. PIECES[math.random(#PIECES)]
+                elseif op == 2 then
+                    local cut = math.random(#text)
+                    text = text:sub(1, cut - 1) .. text:sub(cut + 1)
+                else
+                    text = PIECES[math.random(#PIECES)] .. text
+                end
+                if not runner.run(text, env_mod.new()) then
+                    error("no output for " .. text)
+                end
+            end
+            for _, src in ipairs(suite.hostile) do
+                if not runner.run(src, env_mod.new()) then
+                    error("no output for " .. src)
+                end
+            end
+        end)
+
+        for _, name in ipairs(names) do
+            _G[name] = saved[name]
+        end
+        set(os, "execute", real_execute)
+        set(io, "open", real_open)
+        assert.is_true(ok, tostring(err))
+        assert.are.equal(0, calls)
+    end)
+end)

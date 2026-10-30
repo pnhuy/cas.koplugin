@@ -3,16 +3,16 @@
 -- are offered; unsupported commands (diff, solve, ...) never appear.
 
 local calccas = require("calccas")
+local registry = require("calccas.registry")
 
 local M = {}
 
-local COMMANDS = { "expand", "simplify", "plot" }
-
--- Display order. Names the engine adds later land in "more".
+-- Display order. Which names each group holds comes from the registry; names
+-- the registry adds to another group land in "more".
 local GROUPS = {
-    { id = "common", label = "common", names = { "sin", "cos", "tan", "sqrt", "plot" } },
-    { id = "basic", label = "basic", names = { "abs", "exp", "log", "ln" } },
-    { id = "algebra", label = "algebra", names = { "simplify", "expand" } },
+    { id = "common", label = "common" },
+    { id = "basic", label = "basic" },
+    { id = "algebra", label = "algebra" },
 }
 
 local function item(name)
@@ -25,14 +25,14 @@ function M.groups(supported)
     for _, name in ipairs(supported or calccas.functions()) do
         available[name] = true
     end
-    for _, name in ipairs(COMMANDS) do
+    for _, name in ipairs(registry.commands()) do
         available[name] = true
     end
 
     local placed, groups = {}, {}
     for _, def in ipairs(GROUPS) do
         local items = {}
-        for _, name in ipairs(def.names) do
+        for _, name in ipairs(registry.group(def.id)) do
             if available[name] then
                 items[#items + 1] = item(name)
                 placed[name] = true

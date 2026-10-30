@@ -14,9 +14,9 @@ local function fail(err, line)
     return output.error(err, line)
 end
 
--- Evaluates `text` in the environment, returning the engine result.
-local function evaluate(text, env)
-    return calccas.evaluate(text, env.vars, env.funcs)
+-- Evaluates a parsed statement in the environment, returning the engine result.
+local function evaluate(node, env)
+    return calccas.evaluate(node, env.vars, env.funcs)
 end
 
 local function value_node(value)
@@ -27,19 +27,15 @@ local function value_node(value)
 end
 
 local function run_funcdef(stmt, env)
-    local body, err = calccas.parse(stmt.text, { user_funcs = env.funcs })
-    if not body then
-        return nil, err
-    end
-    local ok, serr = env:set_func(stmt.name, stmt.param, body)
+    local ok, serr = env:set_func(stmt.name, stmt.params, stmt.node)
     if not ok then
         return nil, serr
     end
-    return output.text(stmt.name .. "(" .. stmt.param .. ") = " .. calccas.tostring(body))
+    return output.text(stmt.name .. "(" .. table.concat(stmt.params, ", ") .. ") = " .. calccas.tostring(stmt.node))
 end
 
 local function run_assign(stmt, env)
-    local result, err = evaluate(stmt.text, env)
+    local result, err = evaluate(stmt.node, env)
     if not result then
         return nil, err
     end
@@ -54,15 +50,15 @@ local function run_assign(stmt, env)
     return output.text(stmt.name .. " = " .. result.text)
 end
 
--- One plot argument -> `{label, ast}` with defined variables substituted.
-local function plot_function(arg, env)
-    local text = arg
-    if env.funcs[arg] then
-        text = arg .. "(x)"
-    end
-    local node, err = calccas.parse(text, { user_funcs = env.funcs })
-    if not node then
-        return nil, err
+-- One plot argument -> `{label, ast}` with defined variables substituted. A
+-- bare function name `f` plots `f(x)`.
+local function plot_function(label, node, env)
+    local entry = node.t == "var" and env.funcs[node.name]
+    if entry then
+        if #entry.params ~= 1 then
+            return nil, { kind = "syntax", message = "`" .. node.name .. "` takes " .. #entry.params .. " arguments" }
+        end
+        node = ast.substitute(entry.body, entry.params[1], ast.var("x"))
     end
     for _, name in ipairs(eval.free_vars(node)) do
         if name ~= "x" and env.vars[name] ~= nil then
@@ -73,23 +69,19 @@ local function plot_function(arg, env)
     if not fn then
         return nil, cerr
     end
-    return { label = arg, ast = node }
+    return { label = label, ast = node }
 end
 
 local function run_plot(stmt, env)
     local functions = {}
-    for i, arg in ipairs(stmt.args) do
-        local entry, err = plot_function(arg, env)
+    for i, label in ipairs(stmt.args) do
+        local entry, err = plot_function(label, stmt.arg_nodes[i], env)
         if not entry then
             return nil, err
         end
         functions[i] = entry
     end
-    local range
-    if stmt.range then
-        range = { lo = tonumber(stmt.range.lo), hi = tonumber(stmt.range.hi) }
-    end
-    local out, err = output.graph(functions, range)
+    local out, err = output.graph(functions, stmt.range)
     if not out then
         return nil, err
     end
@@ -97,19 +89,23 @@ local function run_plot(stmt, env)
 end
 
 local function run_expr(stmt, env)
-    local result, err = evaluate(stmt.text, env)
+    local result, err = evaluate(stmt.node, env)
     if not result then
         return nil, err
     end
     return output.value(result)
 end
 
-local RUNNERS = { funcdef = run_funcdef, assign = run_assign, plot = run_plot, expr = run_expr }
+local function run_error(stmt)
+    return nil, stmt.err
+end
+
+local RUNNERS = { funcdef = run_funcdef, assign = run_assign, plot = run_plot, expr = run_expr, error = run_error }
 
 -- `opts.yield`: called between statements; returning `false` cancels the run.
 function M.run(source, env, opts)
     local yield = opts and opts.yield
-    local list, perr = statement.parse(source)
+    local list, perr = statement.parse(source, { env = env, lazy = true })
     if not list then
         return fail(perr)
     end
@@ -126,7 +122,7 @@ function M.run(source, env, opts)
         local out, err = RUNNERS[stmt.kind](stmt, env)
         if not out then
             env:restore(snap)
-            return fail(err, stmt.line)
+            return fail(err, err.line or stmt.line)
         end
         last = out
     end

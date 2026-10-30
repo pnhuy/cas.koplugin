@@ -37,3 +37,25 @@ describe("simplify domain safety", function()
         assert.are.same({}, simplified("2*x+3*x").assumptions)
     end)
 end)
+
+describe("evaluation domains (language reference)", function()
+    local rows = {
+        { "1/0", "div_by_zero" }, { "0/0", "div_by_zero" }, { "x/0", "div_by_zero" }, { "0^-1", "div_by_zero" },
+        { "sqrt(-1)", "domain" }, { "log(0)", "domain" }, { "log(-1)", "domain" }, { "ln(0)", "domain" },
+        { "tan(pi/2)", "domain" }, { "(-8)^(1/3)", "domain" }, { "0^0", "undefined" },
+        { "exp(1000)", "overflow" }, { "10^400", "overflow" },
+    }
+    for _, row in ipairs(rows) do
+        it(row[1] .. " is a " .. row[2] .. " error", function()
+            local res, err = calccas.evaluate(row[1])
+            assert.is_nil(res)
+            assert.are.equal(row[2], err.kind)
+        end)
+    end
+
+    for _, src in ipairs({ "sqrt(0)", "0^2", "tan(0)", "log(1)", "(-8)^3", "(-1)^(1/1)" }) do
+        it(src .. " is inside the domain", function()
+            assert.is_truthy(calccas.evaluate(src))
+        end)
+    end
+end)

@@ -6,11 +6,12 @@ local eval = require("calccas.eval")
 local limits = require("calccas.limits")
 local parser = require("calccas.parser")
 local printer = require("calccas.printer")
+local registry = require("calccas.registry")
 local simplifier = require("calccas.simplify")
 
 local M = {}
 
-local FUNCTION_NAMES = { sin = true, cos = true, tan = true, exp = true, log = true, ln = true, sqrt = true, abs = true }
+M.LANGUAGE_VERSION = registry.VERSION
 
 local function guard(fn)
     return function(...)
@@ -35,14 +36,14 @@ M.parse = guard(function(text, overrides)
     return parser.parse(text, overrides)
 end)
 
+-- Parses a whole cell into statements; see calccas.parser.parse_program.
+M.parse_program = guard(function(text, overrides)
+    return parser.parse_program(text, overrides)
+end)
+
 -- Sorted names of the supported built-in functions.
 function M.functions()
-    local names = {}
-    for name in pairs(FUNCTION_NAMES) do
-        names[#names + 1] = name
-    end
-    table.sort(names)
-    return names
+    return registry.functions()
 end
 
 local function symbolic_result(node, notes)
@@ -54,9 +55,19 @@ local function symbolic_result(node, notes)
     }
 end
 
+local function reject_relation(node)
+    if node.t == "rel" or node.t == "call" then
+        return errors.new("unsupported", "this operation does not apply to an equation or command")
+    end
+end
+
 M.simplify = guard(function(input, user_funcs)
     local node, err = as_ast(input, user_funcs)
     if not node then
+        return nil, err
+    end
+    err = reject_relation(node)
+    if err then
         return nil, err
     end
     return symbolic_result(simplifier.simplify(node))
@@ -67,6 +78,10 @@ M.expand = guard(function(input, user_funcs)
     if not node then
         return nil, err
     end
+    err = reject_relation(node)
+    if err then
+        return nil, err
+    end
     local expanded, notes = simplifier.expand(node)
     if not expanded then
         return nil, notes
@@ -74,43 +89,21 @@ M.expand = guard(function(input, user_funcs)
     return symbolic_result(expanded, notes)
 end)
 
--- "simplify(<expr>)" / "expand(<expr>)" spanning the whole input. Returns the
--- wrapper name and the inner text, or nil when the text is not such a call.
-local function split_wrapper(text)
-    if type(text) ~= "string" then
-        return nil
-    end
-    local name, rest = text:match("^%s*(%a+)%s*(%(.*)$")
-    if name ~= "simplify" and name ~= "expand" then
-        return nil
-    end
-    local depth = 0
-    for i = 1, #rest do
-        local c = rest:sub(i, i)
-        if c == "(" then
-            depth = depth + 1
-        elseif c == ")" then
-            depth = depth - 1
-            if depth == 0 then
-                if rest:sub(i + 1):match("^%s*$") then
-                    return name, rest:sub(2, i - 1)
-                end
-                return nil
-            end
-        end
-    end
-    return nil
-end
-
 -- `user_funcs` (optional): name -> `{param, body}` callable as `name(arg)`.
 M.evaluate = guard(function(input, vars, user_funcs)
-    local wrapper, inner = split_wrapper(input)
-    if wrapper then
-        return M[wrapper](inner, user_funcs)
-    end
     local node, err = as_ast(input, user_funcs)
     if not node then
         return nil, err
+    end
+    if node.t == "call" then
+        local entry = registry.get(node.name)
+        if entry.status == "reserved" then
+            return nil, errors.new("unsupported",
+                "`" .. node.name .. "` is reserved for a future version; not available in language " .. registry.VERSION)
+        elseif node.name == "plot" then
+            return nil, errors.new("unsupported", "plot must be run as its own statement")
+        end
+        return M[node.name](node.args[1], user_funcs)
     end
     local result, eerr = eval.evaluate(node, vars)
     if not result then
@@ -149,7 +142,7 @@ M.parse_assignments = guard(function(text)
         if not name or value == "" then
             return nil, errors.new("syntax", "expected name=value", offset)
         end
-        if name == "pi" or name == "e" or FUNCTION_NAMES[name] then
+        if registry.is_reserved(name) then
             return nil, errors.new("syntax", "'" .. name .. "' cannot be assigned", offset)
         end
         local result, err = M.evaluate(value)

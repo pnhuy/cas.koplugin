@@ -4,12 +4,17 @@
 -- canonically. Exact numbers that overflow fall back to a flagged float.
 -- Constructors only fold constants; neutral elements and like terms are left
 -- for the simplifier.
+-- Statement nodes (rel, call, range, assign, funcdef) are built as plain
+-- records: they are never folded or reordered, only compared and traversed.
 
 local R = require("calccas.rational")
 
 local M = {}
 
-local RANK = { num = 1, const = 2, var = 3, pow = 4, fn = 5, mul = 6, add = 7 }
+local RANK = {
+    num = 1, const = 2, var = 3, pow = 4, fn = 5, mul = 6, add = 7,
+    rel = 8, call = 9, range = 10, assign = 11, funcdef = 12,
+}
 
 local function exact(r)
     return { t = "num", n = r.n, d = r.d }
@@ -37,6 +42,29 @@ end
 
 function M.fn(name, arg)
     return { t = "fn", name = name, arg = arg }
+end
+
+-- `lhs == rhs`; never reduced to a truth value.
+function M.rel(op, lhs, rhs)
+    return { t = "rel", op = op, lhs = lhs, rhs = rhs }
+end
+
+-- A command or function call written with comma-separated arguments.
+function M.call(name, args)
+    return { t = "call", name = name, args = args }
+end
+
+-- `var=lo..hi`, only valid as the last argument of a call that allows it.
+function M.range(var, lo, hi)
+    return { t = "range", var = var, lo = lo, hi = hi }
+end
+
+function M.assign(name, value)
+    return { t = "assign", name = name, value = value }
+end
+
+function M.funcdef(name, params, body)
+    return { t = "funcdef", name = name, params = params, body = body }
 end
 
 function M.num_value(node)
@@ -85,6 +113,35 @@ local function compare(a, b)
             return a.name < b.name and -1 or 1
         end
         return compare(a.arg, b.arg)
+    end
+    if t == "rel" then
+        if a.op ~= b.op then
+            return a.op < b.op and -1 or 1
+        end
+        local c = compare(a.lhs, b.lhs)
+        return c ~= 0 and c or compare(a.rhs, b.rhs)
+    elseif t == "range" then
+        if a.var ~= b.var then
+            return a.var < b.var and -1 or 1
+        end
+        local c = compare(a.lo, b.lo)
+        return c ~= 0 and c or compare(a.hi, b.hi)
+    elseif t == "assign" then
+        if a.name ~= b.name then
+            return a.name < b.name and -1 or 1
+        end
+        return compare(a.value, b.value)
+    elseif t == "funcdef" then
+        if a.name ~= b.name then
+            return a.name < b.name and -1 or 1
+        end
+        local pa, pb = table.concat(a.params, ","), table.concat(b.params, ",")
+        if pa ~= pb then
+            return pa < pb and -1 or 1
+        end
+        return compare(a.body, b.body)
+    elseif t == "call" and a.name ~= b.name then
+        return a.name < b.name and -1 or 1
     end
     local na, nb = #a.args, #b.args
     for i = 1, math.min(na, nb) do
@@ -220,9 +277,21 @@ local function children(node)
         return { node.base, node.exp }
     elseif t == "fn" then
         return { node.arg }
+    elseif t == "rel" then
+        return { node.lhs, node.rhs }
+    elseif t == "call" then
+        return node.args
+    elseif t == "range" then
+        return { node.lo, node.hi }
+    elseif t == "assign" then
+        return { node.value }
+    elseif t == "funcdef" then
+        return { node.body }
     end
     return {}
 end
+
+M.children = children
 
 -- Replaces every variable named `name` with `replacement`, rebuilding through the
 -- constructors so the canonical invariants hold.
@@ -240,8 +309,58 @@ function M.substitute(node, name, replacement)
         return M.pow(M.substitute(node.base, name, replacement), M.substitute(node.exp, name, replacement))
     elseif t == "fn" then
         return M.fn(node.name, M.substitute(node.arg, name, replacement))
+    elseif t == "rel" then
+        return M.rel(node.op, M.substitute(node.lhs, name, replacement), M.substitute(node.rhs, name, replacement))
+    elseif t == "call" then
+        local args = {}
+        for i, a in ipairs(node.args) do
+            args[i] = M.substitute(a, name, replacement)
+        end
+        return M.call(node.name, args)
+    elseif t == "range" then
+        return M.range(node.var, M.substitute(node.lo, name, replacement), M.substitute(node.hi, name, replacement))
+    elseif t == "assign" then
+        return M.assign(node.name, M.substitute(node.value, name, replacement))
+    elseif t == "funcdef" then
+        for _, p in ipairs(node.params) do
+            if p == name then
+                return node
+            end
+        end
+        return M.funcdef(node.name, node.params, M.substitute(node.body, name, replacement))
     end
     return node
+end
+
+-- Deterministic S-expression text, e.g. `(add 1 (mul 2 x))`; used by the
+-- conformance tests to compare structure without a printer.
+function M.dump(node)
+    local t = node.t
+    if t == "num" then
+        if node.approx then
+            return "~" .. string.format("%.15g", node.v)
+        end
+        return node.d == 1 and string.format("%d", node.n) or string.format("%d/%d", node.n, node.d)
+    elseif t == "const" or t == "var" then
+        return node.name
+    elseif t == "fn" then
+        return "(" .. node.name .. " " .. M.dump(node.arg) .. ")"
+    elseif t == "pow" then
+        return "(pow " .. M.dump(node.base) .. " " .. M.dump(node.exp) .. ")"
+    elseif t == "rel" then
+        return "(rel " .. node.op .. " " .. M.dump(node.lhs) .. " " .. M.dump(node.rhs) .. ")"
+    elseif t == "range" then
+        return "(range " .. node.var .. " " .. M.dump(node.lo) .. " " .. M.dump(node.hi) .. ")"
+    elseif t == "assign" then
+        return "(assign " .. node.name .. " " .. M.dump(node.value) .. ")"
+    elseif t == "funcdef" then
+        return "(funcdef " .. node.name .. " (" .. table.concat(node.params, " ") .. ") " .. M.dump(node.body) .. ")"
+    end
+    local parts = { t == "call" and ("call " .. node.name) or t }
+    for _, a in ipairs(node.args) do
+        parts[#parts + 1] = M.dump(a)
+    end
+    return "(" .. table.concat(parts, " ") .. ")"
 end
 
 function M.count(node)

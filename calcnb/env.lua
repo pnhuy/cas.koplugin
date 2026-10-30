@@ -1,6 +1,6 @@
 -- Variables and user functions shared by the cells of a notebook.
 -- Values are whatever `calccas.evaluate(expr, vars)` accepts; functions are
--- `{param, body}` ASTs usable as `user_funcs` by the engine.
+-- `{params, body}` ASTs usable as `user_funcs` by the engine.
 
 local ast = require("calccas.ast")
 local statement = require("calcnb.statement")
@@ -46,7 +46,15 @@ local function same_value(a, b)
 end
 
 local function same_func(a, b)
-    return a ~= nil and b ~= nil and a.param == b.param and ast.equal(a.body, b.body)
+    if a == nil or b == nil or #a.params ~= #b.params then
+        return false
+    end
+    for i, p in ipairs(a.params) do
+        if p ~= b.params[i] then
+            return false
+        end
+    end
+    return ast.equal(a.body, b.body)
 end
 
 -- `version` counts real changes: redefining a name with an equal value keeps it.
@@ -76,8 +84,12 @@ function Env:set_var(name, value)
     return define(self, name, value, nil)
 end
 
-function Env:set_func(name, param, body)
-    return define(self, name, nil, { param = param, body = body })
+-- `params` is a list of parameter names (or one name).
+function Env:set_func(name, params, body)
+    if type(params) == "string" then
+        params = { params }
+    end
+    return define(self, name, nil, { params = params, param = params[1], body = body })
 end
 
 function Env:names()

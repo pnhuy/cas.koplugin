@@ -254,6 +254,16 @@ function print_node(node)
             return print_product({ node })
         end
         return print_pow(node)
+    elseif t == "rel" then
+        return print_node(node.lhs) .. " " .. node.op .. " " .. print_node(node.rhs)
+    elseif t == "call" then
+        local parts = {}
+        for k, a in ipairs(node.args) do
+            parts[k] = print_node(a)
+        end
+        return node.name .. "(" .. table.concat(parts, ", ") .. ")"
+    elseif t == "range" then
+        return node.var .. "=" .. print_node(node.lo) .. ".." .. print_node(node.hi)
     end
     return node.name .. "(" .. print_node(node.arg) .. ")"
 end

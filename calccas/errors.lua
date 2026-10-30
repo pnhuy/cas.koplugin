@@ -14,6 +14,8 @@ local KINDS = {
     unbound_variable = true, -- free variable with no value where one is required
     internal = true,     -- unexpected failure caught at a boundary
     range = true,        -- invalid plot range (non-finite, reversed, too small or too large)
+    reserved = true,     -- a defined name is a built-in or reserved word
+    name = true,         -- a defined name is too long
 }
 
 local Error = {}
