@@ -36,4 +36,6 @@ Grayscale legibility, refresh behavior, physical keys, page-turn buttons, and ti
 
 | Date | What | Result |
 |------|------|--------|
-| (none yet) | | |
+| 2026-10-30 | T002 spike: `CellEditor` (InputText + stub keyboard) in the desktop emulator: system keyboard stays hidden; `addChars`, `leftChar`, `rightChar`, `delChar`, newline and `sin()` with cursor inside work; `isKeyboardVisible()` false | Pass. First run crashed on tapping the editor (needed `parent:getFocusableWidgetXY`, fixed in `CellEditor:init`) |
+| 2026-10-30 | T004 spike: `○ ✎ … ✓ ✕ ◐ ▸ ↑ ↓ ← → ⏎ ⌫ π ∞ ≤ ≥ ≠` in the emulator (NotoSans) | All render; `⌫` and `▸` small. Device fonts not checked |
+| 2026-10-30 | T025 keyboard demo in the emulator (540×720): digits, letters, Shift one-shot, Sym page, `<= >= == != π`, shortcuts (`sin()` with cursor inside, group switch), Enter, Backspace, arrows, Home/End/↑/↓/Del, clipboard keys | Pass per user ("all works"). First run froze on the group switch: the repaint targeted a nested widget; fixed by repainting the host. The keyboard was taller than computed (ButtonTable row gaps); it now measures itself. Demo editor overflowed the right/bottom edge (InputText adds its own border); demo-only, adjusted. Landscape, rotation and device fonts unchecked |

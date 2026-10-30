@@ -47,6 +47,12 @@ function Calculator:addToMainMenu(menu_items)
         sorting_hint = "tools",
         callback = showCalculator,
     }
+    -- TEMPORARY (T025): keyboard demo
+    menu_items.calculator_keyboard_demo = {
+        text = _("Keyboard demo (dev)"),
+        sorting_hint = "tools",
+        callback = guard.wrap(function() require("calcui.keyboard_demo").show() end),
+    }
 end
 
 return Calculator

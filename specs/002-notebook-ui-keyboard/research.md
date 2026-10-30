@@ -156,3 +156,17 @@ AST substitution in the runner (option b) alone cannot work: `f(2)` never parses
 exponentially). `calccas.parse(text, overrides)`, `calccas.evaluate/simplify/expand(input, ..., user_funcs)` pass it
 through. Variables in a body other than `param` stay free and are bound at call time. Covered by
 `spec/calccas/user_funcs_spec.lua`. The engine has no KOReader dependency.
+
+### T002 (R2): editor stub — passed in the emulator
+
+Every use of `self.keyboard` in `inputtext.lua` (`initKeyboard`, `onKeyPress` via `toggleKeyboard`, `onShowKeyboard`,
+`onCloseKeyboard`, `isKeyboardVisible`, `lockKeyboard`, `onCloseWidget`, `getKeyboardDimen`) is answered by the stub
+(`isVisible`, `showKeyboard`, `hideKeyboard`, `lockVisibility`, `free`, `dimen`). Decision R2 stands; no fallback editor.
+**Finding:** `InputText:onTapTextBox` calls `parent:getFocusableWidgetXY(self)` when `Device:hasDPad()` (true in the
+emulator). A parent that is not a `FocusManager` crashes KOReader on a tap. `CellEditor:init` installs a no-op on the
+parent when it is missing. Not yet checked on a real device.
+
+### T004 (R11): glyphs — passed in the emulator
+
+All of `○ ✎ … ✓ ✕ ◐ ▸ ↑ ↓ ← → ⏎ ⌫ π ∞ ≤ ≥ ≠` rendered with the default face. ASCII fallbacks stay documented but are not
+needed in the emulator; device fonts are unchecked.

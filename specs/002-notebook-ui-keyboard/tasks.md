@@ -21,9 +21,9 @@
 **Purpose**: Resolve the three unverified items from research.md before design is locked.
 
 - [X] T001 Add `calcnb` to the luacheck file list and create empty `calcnb/` and `spec/calcnb/` directories; update the lint command in `README.md` and `specs/002-notebook-ui-keyboard/quickstart.md`
-- [ ] T002 Spike R2: in `calcui/cell_editor.lua` subclass `ui/widget/inputtext` with an `initKeyboard` override installing a stub (`isVisible`, `showKeyboard`, `hideKeyboard`, `lockVisibility`, `free`, `dimen`); read every use of `self.keyboard` in `<koreader>/frontend/ui/widget/inputtext.lua` and list them in `research.md` R2; show it in a scratch dialog in the emulator and confirm typing via `addChars`, cursor moves, no system keyboard, no errors in `kodev-run.log`; record pass/fail in `quickstart.md`. If it fails, record the fallback decision (plugin-owned editor)
+- [X] T002 Spike R2: in `calcui/cell_editor.lua` subclass `ui/widget/inputtext` with an `initKeyboard` override installing a stub (`isVisible`, `showKeyboard`, `hideKeyboard`, `lockVisibility`, `free`, `dimen`); read every use of `self.keyboard` in `<koreader>/frontend/ui/widget/inputtext.lua` and list them in `research.md` R2; show it in a scratch dialog in the emulator and confirm typing via `addChars`, cursor moves, no system keyboard, no errors in `kodev-run.log`; record pass/fail in `quickstart.md`. If it fails, record the fallback decision (plugin-owned editor)
 - [X] T003 [P] Spike R5: read `calccas/parser.lua` and `calccas/eval.lua` and record in `research.md` R5 how an unknown call `f(2)` is handled, and pick option (a) or (b)
-- [ ] T004 [P] Spike R11: render `○ ✎ … ✓ ✕ ◐ ▸ ↑ ↓ ←  → ⏎ ⌫ π` in a scratch widget in the emulator; record which glyphs are missing and the ASCII fallbacks in `research.md` R11
+- [X] T004 [P] Spike R11: render `○ ✎ … ✓ ✕ ◐ ▸ ↑ ↓ ←  → ⏎ ⌫ π` in a scratch widget in the emulator; record which glyphs are missing and the ASCII fallbacks in `research.md` R11
 
 **Checkpoint**: editor approach, user-function approach and glyph set are decided.
 
@@ -58,18 +58,18 @@
 
 ### Tests
 
-- [ ] T017 [P] [US2] Write failing specs `spec/calcnb/keyboard_layout_spec.lua` for the four invariants in `contracts/keyboard-layout.md` (every printable ASCII except backtick and tilde reachable without long-press, `pi` key, no key with newline except Enter, compact layout keeps the union of keys)
-- [ ] T018 [P] [US2] Write failing specs `spec/calcnb/shortcuts_spec.lua`: groups built from `calccas.functions()` plus `expand`, `simplify`, `plot`; `diff solve factor integrate limit asin acos atan plot2 parametric polar` absent; each `insert` ends with `()` and `back == 1`; empty groups hidden
-- [ ] T019 [P] [US2] Write failing specs `spec/calcui/keyboard_sizing_spec.lua` for a pure `calcui/keyboard_sizing.lua`: key height and row count give 35-55% of the height in portrait and landscape for 540x720, 720x540 and a small 300x400 screen, and never below the minimum touch size
+- [X] T017 [P] [US2] Write failing specs `spec/calcnb/keyboard_layout_spec.lua` for the four invariants in `contracts/keyboard-layout.md` (every printable ASCII except backtick and tilde reachable without long-press, `pi` key, no key with newline except Enter, compact layout keeps the union of keys)
+- [X] T018 [P] [US2] Write failing specs `spec/calcnb/shortcuts_spec.lua`: groups built from `calccas.functions()` plus `expand`, `simplify`, `plot`; `diff solve factor integrate limit asin acos atan plot2 parametric polar` absent; each `insert` ends with `()` and `back == 1`; empty groups hidden
+- [X] T019 [P] [US2] Write failing specs `spec/calcui/keyboard_sizing_spec.lua` for a pure `calcui/keyboard_sizing.lua`: key height and row count give 35-55% of the height in portrait and landscape for 540x720, 720x540 and a small 300x400 screen, and never below the minimum touch size
 
 ### Implementation
 
-- [ ] T020 [US2] Implement `calcnb/keyboard_layout.lua` (pages `letters`, `shift`, `symbols`; compact variant)
-- [ ] T021 [US2] Implement `calcnb/shortcuts.lua`
-- [ ] T022 [US2] Implement `calcui/keyboard_sizing.lua` (pure)
-- [ ] T023 [US2] Finish `calcui/cell_editor.lua` from T002: multiline, `onTextInput` disabled paths checked, `insert_shortcut(shortcut)` (`addChars` then `leftChar` x back), selection and clipboard helpers using `Device:hasClipboard()`
-- [ ] T024 [US2] Implement `calcui/keyboard.lua`: `ButtonTable` per page, Shift one-shot, Sym toggle, shortcut group switch, editing and cursor keys per the contract, state preserved when switching pages, `guard.wrap` on callbacks, rebuilds only the keyboard on page change
-- [ ] T025 [US2] Scratch harness in `calcui/keyboard_demo.lua` (temporary, opened from a dev-only menu item) showing editor plus docked keyboard; verify in the emulator: all keys, uppercase, multi-byte backspace with `π` text, selection/copy/paste, dismiss and reopen, rapid taps, no evaluation while typing; record in `quickstart.md`. Remove the demo and menu item before US1 is accepted
+- [X] T020 [US2] Implement `calcnb/keyboard_layout.lua` (pages `letters`, `shift`, `symbols`; compact variant)
+- [X] T021 [US2] Implement `calcnb/shortcuts.lua`
+- [X] T022 [US2] Implement `calcui/keyboard_sizing.lua` (pure)
+- [X] T023 [US2] Finish `calcui/cell_editor.lua` from T002: multiline, `onTextInput` disabled paths checked, `insert_shortcut(shortcut)` (`addChars` then `leftChar` x back), selection and clipboard helpers using `Device:hasClipboard()`
+- [X] T024 [US2] Implement `calcui/keyboard.lua`: `ButtonTable` per page, Shift one-shot, Sym toggle, shortcut group switch, editing and cursor keys per the contract, state preserved when switching pages, `guard.wrap` on callbacks, rebuilds only the keyboard on page change
+- [X] T025 [US2] Scratch harness in `calcui/keyboard_demo.lua` (temporary, opened from a dev-only menu item) showing editor plus docked keyboard; verify in the emulator: all keys, uppercase, multi-byte backspace with `π` text, selection/copy/paste, dismiss and reopen, rapid taps, no evaluation while typing; record in `quickstart.md`. Remove the demo and menu item before US1 is accepted
 
 **Checkpoint**: keyboard verified by hand in the emulator; logic tests green.
 
