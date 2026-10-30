@@ -1,5 +1,7 @@
 local CalculatorView = require("calcui.calculator_view")
 local GraphView = require("calcui.graph_view")
+local Notebook = require("calcnb.notebook")
+local NotebookView = require("calcui.notebook_view")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local graph_model = require("calcui.graph_model")
 local guard = require("calcui.guard")
@@ -37,6 +39,19 @@ local showCalculator = guard.wrap(function()
     CalculatorView.show(session, handlers)
 end)
 
+-- The notebook lives for the KOReader process until persistence (US4) lands.
+local notebook
+
+local showNotebook = guard.wrap(function()
+    notebook = notebook or Notebook.new(_("Notebook"))
+    NotebookView.show(notebook, {
+        calculator = showCalculator,
+        graph = function()
+            GraphView.show(graph_state(), function() end)
+        end,
+    })
+end)
+
 function Calculator:init()
     self.ui.menu:registerToMainMenu(self)
 end
@@ -45,13 +60,7 @@ function Calculator:addToMainMenu(menu_items)
     menu_items.calculator = {
         text = _("Calculator"),
         sorting_hint = "tools",
-        callback = showCalculator,
-    }
-    -- TEMPORARY (T025): keyboard demo
-    menu_items.calculator_keyboard_demo = {
-        text = _("Keyboard demo (dev)"),
-        sorting_hint = "tools",
-        callback = guard.wrap(function() require("calcui.keyboard_demo").show() end),
+        callback = showNotebook,
     }
 end
 

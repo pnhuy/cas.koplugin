@@ -83,17 +83,17 @@
 
 ### Tests
 
-- [ ] T026 [P] [US1] Write failing specs `spec/calcui/cell_status_spec.lua` for a pure `calcui/cell_status.lua`: status to symbol and text label (with ASCII fallback from T004), editing overlay does not replace a stored status
-- [ ] T027 [P] [US1] Write failing specs `spec/calcui/notebook_layout_spec.lua` for a pure `calcui/notebook_layout.lua`: given cell heights, viewport height and top index returns the visible cells, page up/down, active cell scrolled into view above the keyboard, top index kept after resize
-- [ ] T028 [P] [US1] Write failing specs `spec/calcnb/run_queue_spec.lua` for `calcnb/run_queue.lua`: one run at a time, second request rejected, Run all in order continuing past errors, cancel on close
+- [X] T026 [P] [US1] Write failing specs `spec/calcui/cell_status_spec.lua` for a pure `calcui/cell_status.lua`: status to symbol and text label (with ASCII fallback from T004), editing overlay does not replace a stored status
+- [X] T027 [P] [US1] Write failing specs `spec/calcui/notebook_layout_spec.lua` for a pure `calcui/notebook_layout.lua`: given cell heights, viewport height and top index returns the visible cells, page up/down, active cell scrolled into view above the keyboard, top index kept after resize
+- [X] T028 [P] [US1] Write failing specs `spec/calcnb/run_queue_spec.lua` for `calcnb/run_queue.lua`: one run at a time, second request rejected, Run all in order continuing past errors, cancel on close
 
 ### Implementation
 
-- [ ] T029 [US1] Implement `calcui/cell_status.lua`, `calcui/notebook_layout.lua`, `calcnb/run_queue.lua`
-- [ ] T030 [US1] Implement `calcui/cell_widget.lua`: input indicator `In [n]`, source (editor when active, static text otherwise), status line, output area (value, error, truncated with Expand, out-of-date marker), Run button
-- [ ] T031 [US1] Implement `calcui/notebook_view.lua`: `TitleBar`/toolbar (title, Add, Save placeholder, Menu, Close), windowed cell list, page buttons and page-turn keys, keyboard docking (notebook area shrinks, active cell and cursor visible), tap cell to edit, Enter inserts newline, Run and Run-and-add, Run all and Clear all outputs in the menu, runs stepped with `UIManager:nextTick` and a 50 ms budget, `guard.wrap` on every callback
-- [ ] T032 [US1] Update `main.lua` so Tools > Calculator opens the notebook; add "Classic calculator" and "Classic graph" entries inside the notebook Menu so the 001 screens stay reachable (plan: retire later)
-- [ ] T033 [US1] Emulator check of US1 acceptance scenarios 1-9 and edge cases (empty cell, Run while running, Run all with errors, name redefinition marks stale); record in `quickstart.md`
+- [X] T029 [US1] Implement `calcui/cell_status.lua`, `calcui/notebook_layout.lua`, `calcnb/run_queue.lua`
+- [X] T030 [US1] Implement `calcui/cell_widget.lua`: input indicator `In [n]`, source (editor when active, static text otherwise), status line, output area (value, error, truncated with Expand, out-of-date marker), Run button
+- [X] T031 [US1] Implement `calcui/notebook_view.lua`: `TitleBar`/toolbar (title, Add, Save placeholder, Menu, Close), windowed cell list, page buttons and page-turn keys, keyboard docking (notebook area shrinks, active cell and cursor visible), tap cell to edit, Enter inserts newline, Run and Run-and-add, Run all and Clear all outputs in the menu, runs stepped with `UIManager:nextTick` and a 50 ms budget, `guard.wrap` on every callback
+- [X] T032 [US1] Update `main.lua` so Tools > Calculator opens the notebook; add "Classic calculator" and "Classic graph" entries inside the notebook Menu so the 001 screens stay reachable (plan: retire later)
+- [X] T033 [US1] Emulator check of US1 acceptance scenarios 1-9 and edge cases (empty cell, Run while running, Run all with errors, name redefinition marks stale); record in `quickstart.md`
 
 **Checkpoint**: notebook usable end to end without graphs or persistence.
 
