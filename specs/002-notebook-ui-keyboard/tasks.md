@@ -146,9 +146,9 @@
 
 **Independent Test**: With four cells duplicate one, move it up, delete another with confirmation, copy a result and paste it into a new cell.
 
-- [ ] T047 [P] [US5] Write failing specs `spec/calcnb/cell_actions_spec.lua` for `calcnb/cell_actions.lua`: copy source/result text, insert result at the cursor, delete confirmation required only when the cell has content
-- [ ] T048 [US5] Implement `calcnb/cell_actions.lua` and the per-cell action row and context menu (`ButtonDialog`) in `calcui/cell_widget.lua` and `calcui/notebook_view.lua`, using `Device.input.setClipboardText`
-- [ ] T049 [US5] Emulator check of US5 scenarios 1-8; record in `quickstart.md`
+- [X] T047 [P] [US5] Write failing specs `spec/calcnb/cell_actions_spec.lua` for `calcnb/cell_actions.lua`: copy source/result text, insert result at the cursor, delete confirmation required only when the cell has content
+- [X] T048 [US5] Implement `calcnb/cell_actions.lua` and the per-cell action row and context menu (`ButtonDialog`) in `calcui/cell_widget.lua` and `calcui/notebook_view.lua`, using `Device.input.setClipboardText`
+- [X] T049 [US5] Emulator check of US5 scenarios 1-8; record in `quickstart.md`
 
 ---
 

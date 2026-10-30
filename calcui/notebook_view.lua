@@ -20,6 +20,7 @@ local store = require("calcui.notebook_store")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
+local cell_actions = require("calcnb.cell_actions")
 local graph_model = require("calcui.graph_model")
 local guard = require("calcui.guard")
 local notebook_layout = require("calcui.notebook_layout")
@@ -333,6 +334,23 @@ local function copy_text(text, what)
     end
 end
 
+-- Types the result of cell `id` at the cursor of the cell being edited.
+function NotebookView:insert_result(id)
+    local cell = self.nb:get(id)
+    local text = cell and cell_actions.insert_text(cell)
+    if not text then
+        UIManager:show(InfoMessage:new{ text = _("This cell has no result to insert"), timeout = 2 })
+        return
+    end
+    if not (self.editor and self.active and self.active ~= id) then
+        UIManager:show(InfoMessage:new{ text = _("Tap another cell to edit it, then insert"), timeout = 2 })
+        return
+    end
+    self.editor:type_text(text)
+    self:sync()
+    UIManager:setDirty(self, "ui")
+end
+
 function NotebookView:show_cell_menu(id)
     self:sync()
     local nb = self.nb
@@ -373,27 +391,36 @@ function NotebookView:show_cell_menu(id)
             end),
             item(_("Copy source"), function()
                 local cell = nb:get(id)
-                copy_text(cell and cell.source, _("Source"))
+                copy_text(cell and cell_actions.source_text(cell), _("Source"))
             end),
             item(_("Copy result"), function()
                 local cell = nb:get(id)
-                copy_text(cell and cell.output and (cell.output.full or cell.output.canonical), _("Result"))
+                copy_text(cell and cell_actions.result_text(cell), _("Result"))
+            end),
+            item(_("Insert result into edited cell"), function()
+                self:insert_result(id)
             end),
             item(_("Clear output"), function()
                 nb:clear_output(id)
                 self:rebuild()
             end),
             item(_("Delete"), function()
+                local function delete()
+                    if self.active == id then
+                        self.active = nil
+                    end
+                    nb:delete(id)
+                    self:rebuild()
+                end
+                local cell = nb:get(id)
+                if cell and not cell_actions.needs_delete_confirmation(cell) then
+                    delete()
+                    return
+                end
                 UIManager:show(ConfirmBox:new{
                     text = _("Delete this cell?"),
                     ok_text = _("Delete"),
-                    ok_callback = guard.wrap(function()
-                        if self.active == id then
-                            self.active = nil
-                        end
-                        nb:delete(id)
-                        self:rebuild()
-                    end),
+                    ok_callback = guard.wrap(delete),
                 })
             end),
         },
@@ -415,8 +442,18 @@ function NotebookView:show_menu()
             self:run_cells(self.nb:begin_run_all())
         end),
         item(_("Clear all outputs"), function()
-            self.nb:clear_all_outputs()
-            self:rebuild()
+            local function clear()
+                self.nb:clear_all_outputs()
+                self:rebuild()
+            end
+            if not cell_actions.has_outputs(self.nb) then
+                return
+            end
+            UIManager:show(ConfirmBox:new{
+                text = _("Clear all outputs? The cells' text is kept."),
+                ok_text = _("Clear"),
+                ok_callback = guard.wrap(clear),
+            })
         end),
     }
     if self.handlers and self.handlers.calculator then
