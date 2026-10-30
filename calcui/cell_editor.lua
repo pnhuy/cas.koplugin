@@ -40,6 +40,44 @@ function CellEditor:initKeyboard()
     self.keyboard = new_stub()
 end
 
+-- `on_change(self)` is called after every change of the text or the cursor,
+-- from any source (virtual keyboard, hardware keys, a tap in the text). The
+-- InputText methods call each other, so only the outermost call notifies.
+local OBSERVED = {
+    "addChars", "delChar", "delNextChar", "delToStartOfLine", "delAll", "leftChar",
+    "rightChar", "upLine", "downLine", "goToStartOfLine", "goToEndOfLine", "goToHome",
+    "goToEnd", "moveCursorToCharPos", "setText", "resyncPos",
+}
+
+function CellEditor:notify_change()
+    if self.on_change and (self.change_depth or 0) == 0 then
+        self.on_change(self)
+    end
+end
+
+for _, name in ipairs(OBSERVED) do
+    local original = InputText[name]
+    CellEditor[name] = function(self, ...)
+        self.change_depth = (self.change_depth or 0) + 1
+        local ok, err = pcall(original, self, ...)
+        self.change_depth = self.change_depth - 1
+        if not ok then
+            error(err, 0)
+        end
+        self:notify_change()
+    end
+end
+
+-- InputText handles Press, Tab and Back itself, and a focused editor sees key
+-- presses before its parent. `key_filter(key)` lets the notebook (the
+-- suggestion strip) take a key first; returning true consumes it.
+function CellEditor:onKeyPress(key)
+    if self.key_filter and self.key_filter(key) then
+        return true
+    end
+    return InputText.onKeyPress(self, key)
+end
+
 -- Selection is whole-cell only: "All" marks the text, and the next typed
 -- character, Backspace, Cut or Paste acts on all of it; any other key clears
 -- the mark. Copy/Cut use KOReader's clipboard.
@@ -96,6 +134,35 @@ function CellEditor:move(name)
         home = "goToStartOfLine", ["end"] = "goToEndOfLine",
     }
     self[methods[name]](self)
+end
+
+-- Text and cursor position (1-based character position) for the completion session.
+function CellEditor:cursor()
+    return self:getText(), self.charpos
+end
+
+-- Applies an edit from `calcnb.completion` (contracts/strip-ui.md, "Accepting"):
+-- replaces the characters `edit.first..edit.last` with the new text and puts
+-- the cursor at `edit.charpos`. `on_change` fires once, at the end.
+function CellEditor:replace_word(edit)
+    self.selected_all = false
+    local count = edit.last - edit.first + 1
+    local before = self:getText()
+    self.change_depth = (self.change_depth or 0) + 1
+    local ok, err = pcall(function()
+        self:moveCursorToCharPos(edit.last + 1)
+        for _ = 1, count do
+            self:delChar()
+        end
+        self:addChars(edit.insert)
+        self:moveCursorToCharPos(edit.charpos)
+    end)
+    self.change_depth = self.change_depth - 1
+    if not ok then
+        self:setText(before, true)
+        error(err, 0)
+    end
+    self:notify_change()
 end
 
 function CellEditor:copy()

@@ -207,6 +207,7 @@ function Notebook:clear_output(id)
     local cell = self:get(id)
     if cell then
         cell.output, cell.exec_number, cell.ran_at_env = nil, nil, nil
+        cell.defined = nil
         cell.out_of_date = false
         cell.status = "idle"
     end
@@ -234,6 +235,9 @@ function Notebook:run_cell(id, opts)
     cell.ran_at_env = self.env.version
     cell.out_of_date = false
     cell.status = out.kind == "error" and "error" or "completed"
+    if out.kind ~= "error" then
+        cell.defined = out.defined or {}
+    end
     if self.env.version ~= before then
         for j = i + 1, #self.cells do
             local later = self.cells[j]
@@ -245,12 +249,34 @@ function Notebook:run_cell(id, opts)
     return out
 end
 
+-- Names the notebook offers for completion: what each cell's last successful
+-- run defined (`cell.defined`, a ledger kept in memory only), later cells
+-- winning. The environment never forgets a name, so it cannot answer this.
+-- Returns `{name, kind, params}` sorted by name.
+function Notebook:completion_names()
+    local by_name = {}
+    for _, cell in ipairs(self.cells) do
+        if cell.type == "code" and cell.defined then
+            for _, def in ipairs(cell.defined) do
+                by_name[def.name] = def
+            end
+        end
+    end
+    local list = {}
+    for _, def in pairs(by_name) do
+        list[#list + 1] = { name = def.name, kind = def.kind, params = def.params }
+    end
+    table.sort(list, function(a, b) return a.name < b.name end)
+    return list
+end
+
 -- Resets the environment and returns the ids of the code cells in order; the
 -- caller runs them one by one (one per UI tick).
 function Notebook:begin_run_all()
     self.env:clear()
     local ids = {}
     for _, c in ipairs(self.cells) do
+        c.defined = nil
         if c.type == "code" then
             ids[#ids + 1] = c.id
         end

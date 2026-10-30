@@ -28,6 +28,14 @@ Minimum KOReader version: **v2025.10 (provisional)**. The APIs used were checked
 - Keyboard: letters with one-shot Shift, digits, operators, a symbols page (`{ } < > <= >= == != % _ : ; | & ? \ " ' @ # $ π ∞`),
   arrows, Home/End, Delete, clipboard keys, and shortcut groups (common: `sin cos tan sqrt plot`; basic:
   `abs exp log ln`; algebra: `simplify expand`). A shortcut inserts `name()` with the cursor inside the brackets.
+- Suggestions: while you type a word in a cell, a strip above the keyboard offers built-in functions, constants and
+  the variables and functions your cells have defined (matching the start of the word). The highlighted one shows its
+  signature, a short description and an example. Tap the highlighted chip to insert it at the cursor (a function
+  becomes `name()` with the cursor inside the brackets); tap another chip to highlight it. `✕` dismisses the strip for
+  that word without changing the text. With keys: Page forward/back move the highlight, Press or Tab insert, Back
+  dismisses. Reserved names such as `diff` are offered last, marked `*` and "not available yet". Accepting a
+  suggestion never runs anything. A name is offered only after the cell that defines it has run; re-running that cell
+  with other names drops the old ones.
 - `plot(...)` draws inline. Tap the graph for the full-screen viewer: zoom, pan, reset, Range, Grid, Axes, 1:1 (equal axis
   scale) and **Inspect** (evaluate the plotted functions at an x value). Buttons only; no gestures are required.
 - **Insert result** into another cell works only while that cell is being edited.

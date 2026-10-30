@@ -129,3 +129,64 @@ describe("input never reaches a Lua loader or the system", function()
         assert.are.equal(0, calls)
     end)
 end)
+
+describe("completion on hostile and random text", function()
+    local completion = require("calcnb.completion")
+    local session_mod = require("calcnb.completion_session")
+    local suite = require("spec.calccas.conformance_cases")
+
+    local PIECES = { "si", "sin(", "x", " ", "\n", "é", "∞", "dif", "pi", "1.5", "#", "--", "(", ")", "plot(", "x=", "..", "\0" }
+    local NAMES = { { name = "rate", kind = "var" }, { name = "sf", kind = "func", params = { "a" } } }
+
+    local function chars(text)
+        local list = {}
+        for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+            list[#list + 1] = ch
+        end
+        return list
+    end
+
+    local function check(text, charpos)
+        local word = completion.word_at(text, charpos)
+        local found = completion.suggest(word and word.prefix or "", NAMES)
+        if word and found.items[1] then
+            local edit = completion.apply(text, word, found.items[1])
+            if edit then
+                local before, after = chars(text), chars(edit.text)
+                for i = 1, word.first - 1 do
+                    assert.are.equal(before[i], after[i])
+                end
+                local tail = #before - word.last
+                for i = 1, tail do
+                    assert.are.equal(before[word.last + i], after[#after - tail + i])
+                end
+            end
+        end
+        local session = session_mod.new()
+        session:set_names(NAMES)
+        session:update(text, charpos)
+        session:move(1)
+        session:accept()
+        session:dismiss()
+    end
+
+    it("never raises and never loses text outside the replaced word", function()
+        math.randomseed(2026)
+        local function run(text)
+            local n = #chars(text)
+            for _, pos in ipairs({ -3, 0, 1, math.floor(n / 2) + 1, n + 1, n + 7 }) do
+                local ok, err = pcall(check, text, pos)
+                assert.is_true(ok, tostring(err))
+            end
+        end
+        local text = ""
+        for _ = 1, 200 do
+            text = text .. PIECES[math.random(#PIECES)]
+            run(text)
+        end
+        run("")
+        for _, src in ipairs(suite.hostile) do
+            run(src)
+        end
+    end)
+end)

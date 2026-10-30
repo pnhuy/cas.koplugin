@@ -151,27 +151,27 @@ constants are `pi` and `e`; they are reserved, and `2*pi` shows `2*pi ≈ 6.2831
 Generated from the function registry (`calccas/registry.lua`) and checked against it by `spec/docs_spec.lua`.
 
 <!-- registry:begin -->
-| Name | Kind | Arguments | Status | Example |
-|------|------|-----------|--------|---------|
-| `sin` | function | 1 | implemented | `sin(pi/2)` |
-| `cos` | function | 1 | implemented | `cos(0)` |
-| `tan` | function | 1 | implemented | `tan(0)` |
-| `sqrt` | function | 1 | implemented | `sqrt(9/4)` |
-| `plot` | command | 1 to 6 | implemented | `plot(sin(x), x=-5..5)` |
-| `abs` | function | 1 | implemented | `abs(-3)` |
-| `exp` | function | 1 | implemented | `exp(0)` |
-| `log` | function | 1 | implemented | `log(1)` |
-| `ln` | function | 1 | implemented | `ln(1)` |
-| `simplify` | command | 1 | implemented | `simplify(2*x + 3*x)` |
-| `expand` | command | 1 | implemented | `expand((x+1)^2)` |
-| `pi` | constant | 0 | implemented | `pi` |
-| `e` | constant | 0 | implemented | `e` |
-| `factor` | command | 1 | reserved | |
-| `solve` | command | 1 to 2 | reserved | |
-| `subs` | command | 2 to 8 | reserved | |
-| `approx` | command | 1 | reserved | |
-| `diff` | command | 1 to 2 | reserved | |
-| `integrate` | command | 1 to 2 | reserved | |
+| Name | Kind | Arguments | Status | Signature | Example |
+|------|------|-----------|--------|-----------|---------|
+| `sin` | function | 1 | implemented | `sin(x)` | `sin(pi/2)` |
+| `cos` | function | 1 | implemented | `cos(x)` | `cos(0)` |
+| `tan` | function | 1 | implemented | `tan(x)` | `tan(0)` |
+| `sqrt` | function | 1 | implemented | `sqrt(x)` | `sqrt(9/4)` |
+| `plot` | command | 1 to 6 | implemented | `plot(f1[, f2, ...], x=lo..hi)` | `plot(sin(x), x=-5..5)` |
+| `abs` | function | 1 | implemented | `abs(x)` | `abs(-3)` |
+| `exp` | function | 1 | implemented | `exp(x)` | `exp(0)` |
+| `log` | function | 1 | implemented | `log(x)` | `log(1)` |
+| `ln` | function | 1 | implemented | `ln(x)` | `ln(1)` |
+| `simplify` | command | 1 | implemented | `simplify(expr)` | `simplify(2*x + 3*x)` |
+| `expand` | command | 1 | implemented | `expand(expr)` | `expand((x+1)^2)` |
+| `pi` | constant | 0 | implemented | `pi` | `pi` |
+| `e` | constant | 0 | implemented | `e` | `e` |
+| `factor` | command | 1 | reserved | `factor(expr)` | |
+| `solve` | command | 1 to 2 | reserved | `solve(eq[, symbol])` | |
+| `subs` | command | 2 to 8 | reserved | `subs(expr, x, value)` | |
+| `approx` | command | 1 | reserved | `approx(expr)` | |
+| `diff` | command | 1 to 2 | reserved | `diff(expr[, symbol])` | |
+| `integrate` | command | 1 to 2 | reserved | `integrate(expr[, symbol])` | |
 <!-- registry:end -->
 
 `ln` is another name for `log` (natural logarithm). `simplify` and `expand` take one expression. A **reserved** command parses

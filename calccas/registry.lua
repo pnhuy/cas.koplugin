@@ -38,6 +38,11 @@ for _, entry in ipairs(ENTRIES) do
     BY_NAME[entry.name] = entry
 end
 
+-- The entries in display order. The list and its entries are shared; callers must not modify them.
+function M.entries()
+    return ENTRIES
+end
+
 -- Entry for a name, or nil. Entries are shared; callers must not modify them.
 function M.get(name)
     return BY_NAME[name]

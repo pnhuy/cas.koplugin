@@ -24,12 +24,18 @@ local cell_actions = require("calcnb.cell_actions")
 local graph_model = require("calcui.graph_model")
 local guard = require("calcui.guard")
 local notebook_layout = require("calcui.notebook_layout")
+local completion_session = require("calcnb.completion_session")
+local keyboard_layout = require("calcnb.keyboard_layout")
 local run_queue = require("calcnb.run_queue")
+local strip_sizing = require("calcui.strip_sizing")
+local SuggestionStrip = require("calcui.suggestion_strip")
 local _ = require("gettext")
 
 local Screen = Device.screen
 
 local ESTIMATED_CELL_H = 140
+local STRIP_ROW_H = 34 -- scaled; one row of the suggestion strip
+local CHIPS_COMPACT, CHIPS_WIDE = 4, 6
 
 local NotebookView = InputContainer:extend{
     session = nil, -- notebook_store session: { nb, dirty, scroll, problems }
@@ -48,12 +54,14 @@ function NotebookView:init()
     self.heights = {}
     self.queue = run_queue.new()
     self.keyboard = Keyboard:new{ dirty_target = self }
+    self.completion = completion_session.new()
     if Device:hasKeys() then
         local Input = Device.input
         self.key_events = {
             NextPage = { { Input.group.PgFwd }, event = "NextPage" },
             PrevPage = { { Input.group.PgBack }, event = "PrevPage" },
             CloseNotebook = { { Input.group.Back }, event = "CloseNotebook" },
+            AcceptSuggestion = { { "Press" }, { "Tab" }, event = "AcceptSuggestion" },
         }
     end
     self:rebuild()
@@ -103,6 +111,13 @@ function NotebookView:sync()
     end
 end
 
+-- Draws the session's current model on the strip; repaints only the strip.
+local function strip_model(self)
+    if self.strip then
+        self.strip:set_model(self.completion:model())
+    end
+end
+
 local function bar(width, buttons)
     return ButtonTable:new{ width = width, sep_width = 0, buttons = { buttons } }
 end
@@ -140,7 +155,13 @@ function NotebookView:rebuild()
     local pagebar = bar(w, pagebar_buttons)
 
     local kb_h = self.active and self.keyboard:getHeight() or 0
-    local content_h = h - toolbar:getSize().h - pagebar:getSize().h - kb_h
+    local strip_h, strip_rows = 0, 0
+    local line_h = Screen:scaleBySize(STRIP_ROW_H)
+    if self.active then
+        local fit = strip_sizing.strip_height(h, w, kb_h, toolbar:getSize().h + pagebar:getSize().h, line_h)
+        strip_h, strip_rows = fit.height, fit.rows
+    end
+    local content_h = h - toolbar:getSize().h - pagebar:getSize().h - kb_h - strip_h
 
     local count = #nb.cells
     self.top = notebook_layout.clamp(self.top, count)
@@ -204,8 +225,12 @@ function NotebookView:rebuild()
     end
 
     local column = VerticalGroup:new{ align = "left", toolbar, page, pagebar }
+    self.strip = nil
     if self.active then
         self.keyboard.editor = self.editor
+        if strip_rows > 0 and self.editor then
+            column[#column + 1] = self:build_strip(w, strip_rows, line_h)
+        end
         column[#column + 1] = self.keyboard
     end
     self[1] = FrameContainer:new{
@@ -217,6 +242,58 @@ function NotebookView:rebuild()
         column,
     }
     UIManager:setDirty(self, "ui")
+end
+
+-- A fresh session for each edited cell; a rebuild of the same cell keeps its
+-- dismissal and highlight.
+function NotebookView:build_strip(w, rows, line_h)
+    if self.completion_for ~= self.active then
+        self.completion, self.completion_for = completion_session.new(), self.active
+    end
+    self.completion:set_limit(keyboard_layout.is_compact(w) and CHIPS_COMPACT or CHIPS_WIDE)
+    self.completion:set_names(self.nb:completion_names())
+    local strip = SuggestionStrip:new{
+        width = w,
+        rows = rows,
+        line_h = line_h,
+        on_accept = function() self:accept_suggestion() end,
+        on_select = function(index)
+            if self.completion:select(index) then
+                strip_model(self)
+            end
+        end,
+        on_dismiss = function()
+            if self.completion:dismiss() then
+                strip_model(self)
+            end
+        end,
+    }
+    self.strip = strip
+    local editor = self.editor
+    editor.on_change = guard.wrap(function() self:update_suggestions() end)
+    editor.key_filter = function(key) return self:strip_key(key) end
+    self.completion:update(editor:cursor())
+    strip:set_model(self.completion:model(), true)
+    return strip
+end
+
+function NotebookView:update_suggestions()
+    if not (self.strip and self.editor) then
+        return
+    end
+    self.completion:set_names(self.nb:completion_names())
+    self.completion:update(self.editor:cursor())
+    strip_model(self)
+end
+
+-- Inserts the highlighted suggestion at the cursor. Nothing is run.
+function NotebookView:accept_suggestion()
+    local edit = self.editor and self.completion:accept()
+    if edit then
+        self.editor:replace_word(edit)
+        self:sync()
+    end
+    strip_model(self)
 end
 
 function NotebookView:start_editing(id)
@@ -244,13 +321,60 @@ function NotebookView:page(direction)
     self:rebuild()
 end
 
+-- True while the suggestion strip is on screen; the keys then belong to it.
+function NotebookView:strip_shown()
+    return self.strip ~= nil and self.editor ~= nil and self.completion:model() ~= nil
+end
+
+-- Keys for the strip while it is shown (see CellEditor:onKeyPress); true when taken.
+function NotebookView:strip_key(key)
+    if not self:strip_shown() then
+        return false
+    end
+    if key["Press"] or key["Tab"] then
+        return self:onAcceptSuggestion()
+    elseif key["Back"] then
+        return self:onCloseNotebook()
+    elseif key["RPgFwd"] or key["LPgFwd"] then
+        return self:onNextPage()
+    elseif key["RPgBack"] or key["LPgBack"] then
+        return self:onPrevPage()
+    end
+    return false
+end
+
 function NotebookView:onNextPage()
+    if self:strip_shown() then
+        guard.wrap(function()
+            if self.completion:move(1) then
+                strip_model(self)
+            end
+        end)()
+        return true
+    end
     self:page(1)
     return true
 end
 
 function NotebookView:onPrevPage()
+    if self:strip_shown() then
+        guard.wrap(function()
+            if self.completion:move(-1) then
+                strip_model(self)
+            end
+        end)()
+        return true
+    end
     self:page(-1)
+    return true
+end
+
+-- Press and Tab accept the highlighted suggestion; with no strip they are not ours.
+function NotebookView:onAcceptSuggestion()
+    if not self:strip_shown() then
+        return false
+    end
+    guard.wrap(function() self:accept_suggestion() end)()
     return true
 end
 
@@ -486,6 +610,14 @@ function NotebookView:close()
 end
 
 function NotebookView:onCloseNotebook()
+    if self:strip_shown() then
+        guard.wrap(function()
+            if self.completion:dismiss() then
+                strip_model(self)
+            end
+        end)()
+        return true
+    end
     self:close()
     return true
 end

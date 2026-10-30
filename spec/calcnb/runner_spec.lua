@@ -155,3 +155,36 @@ describe("calcnb.runner", function()
     assert.is_nil(_G.__calcnb_pwned)
   end)
 end)
+
+describe("calcnb.runner defined names", function()
+  it("lists an assignment and a function definition", function()
+    local o = run("a = 1")
+    assert.are.same({ { name = "a", kind = "var" } }, o.defined)
+    local f = run("f(x, y) = x + y")
+    assert.are.same({ { name = "f", kind = "func", params = { "x", "y" } } }, f.defined)
+  end)
+
+  it("lists every definition of a multi-line cell once, later ones winning", function()
+    local o = run("a = 1\ng(t) = t\na = 2")
+    assert.are.same({
+      { name = "a", kind = "var" },
+      { name = "g", kind = "func", params = { "t" } },
+    }, o.defined)
+  end)
+
+  it("defines nothing for expressions and plots", function()
+    assert.are.same({}, run("1 + 2").defined)
+    assert.are.same({}, run("plot(sin(x), x=-1..1)").defined)
+    assert.are.same({}, run("").defined)
+  end)
+
+  it("gives a failing run no defined list, even when an earlier statement succeeded", function()
+    local o, e = run("a = 1\nb = (")
+    assert.are.equal("error", o.kind)
+    assert.is_nil(o.defined)
+    assert.is_nil(e.vars.a)
+    local o2 = run("a = 1\nb = 1/0")
+    assert.are.equal("error", o2.kind)
+    assert.is_nil(o2.defined)
+  end)
+end)

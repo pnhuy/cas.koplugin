@@ -289,3 +289,98 @@ describe("calcnb.notebook text cells", function()
     assert.are.equal("text", nb:duplicate(t.id).type)
   end)
 end)
+
+describe("calcnb.notebook completion names", function()
+  local function names(nb)
+    local list = {}
+    for _, def in ipairs(nb:completion_names()) do
+      list[#list + 1] = def.name .. ":" .. def.kind
+    end
+    return list
+  end
+
+  it("is empty before anything runs", function()
+    assert.are.same({}, new_with({ "a = 1" }):completion_names())
+  end)
+
+  it("sets cell.defined on a successful run and offers the names", function()
+    local nb = new_with({ "rate = 5", "f(x) = x + rate" })
+    nb:run_cell(nb.cells[1].id)
+    nb:run_cell(nb.cells[2].id)
+    assert.are.same({ { name = "rate", kind = "var" } }, nb.cells[1].defined)
+    assert.are.same({ "f:func", "rate:var" }, names(nb))
+    assert.are.same({ "x" }, nb:completion_names()[1].params)
+  end)
+
+  it("leaves cell.defined unchanged when a run ends in an error", function()
+    local nb = new_with({ "rate = 5" })
+    local id = nb.cells[1].id
+    nb:run_cell(id)
+    nb:set_source(id, "rate = 6\nspeed = (")
+    nb:run_cell(id)
+    assert.are.equal("error", nb.cells[1].status)
+    assert.are.same({ "rate:var" }, names(nb))
+  end)
+
+  it("drops a name when its cell is re-run with another definition", function()
+    local nb = new_with({ "rate = 5" })
+    local id = nb.cells[1].id
+    nb:run_cell(id)
+    nb:set_source(id, "speed = 5")
+    nb:run_cell(id)
+    assert.is_not_nil(nb.env.vars.rate) -- the environment never forgets
+    assert.are.same({ "speed:var" }, names(nb))
+  end)
+
+  it("lets a later cell win on a duplicate name", function()
+    local nb = new_with({ "a = 1", "a(x) = x" })
+    nb:run_cell(nb.cells[1].id)
+    nb:run_cell(nb.cells[2].id)
+    assert.are.same({ "a:func" }, names(nb))
+    nb:move(nb.cells[2].id, -1)
+    assert.are.same({ "a:var" }, names(nb))
+  end)
+
+  it("is emptied by clear_output, clear_all_outputs and begin_run_all", function()
+    local nb = new_with({ "a = 1", "b = 2" })
+    nb:run_cell(nb.cells[1].id)
+    nb:run_cell(nb.cells[2].id)
+    nb:clear_output(nb.cells[1].id)
+    assert.are.same({ "b:var" }, names(nb))
+    nb:clear_all_outputs()
+    assert.are.same({}, names(nb))
+    nb:run_cell(nb.cells[1].id)
+    nb:begin_run_all()
+    assert.are.same({}, names(nb))
+  end)
+
+  it("starts empty after a restore and gives a duplicate nothing until it runs", function()
+    local store_logic = require("calcnb.store_logic")
+    local nb = new_with({ "a = 1" })
+    nb:run_cell(nb.cells[1].id)
+    local copy = nb:duplicate(nb.cells[1].id)
+    assert.is_nil(copy.defined)
+    assert.are.same({ "a:var" }, names(nb))
+    local restored = store_logic.from_file(store_logic.to_file(nb))
+    assert.are.same({}, restored:completion_names())
+  end)
+
+  it("removes the names of a deleted cell and keeps the saved bytes unchanged by running", function()
+    local store_logic = require("calcnb.store_logic")
+    local nb = new_with({ "a = 1", "b = 2" })
+    local saved = store_logic.to_file(nb)
+    nb:run_cell(nb.cells[1].id)
+    nb:run_cell(nb.cells[2].id)
+    assert.are.same(saved, store_logic.to_file(nb))
+    nb:delete(nb.cells[1].id)
+    assert.are.same({ "b:var" }, names(nb))
+  end)
+
+  it("ignores text cells", function()
+    local nb = new_with({ "a = 1" })
+    local note = nb:add(2, "text")
+    nb:set_source(note.id, "b = 2")
+    nb:run_cell(nb.cells[1].id)
+    assert.are.same({ "a:var" }, names(nb))
+  end)
+end)

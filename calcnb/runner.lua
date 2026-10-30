@@ -102,6 +102,9 @@ end
 
 local RUNNERS = { funcdef = run_funcdef, assign = run_assign, plot = run_plot, expr = run_expr, error = run_error }
 
+-- On success the result carries `defined`: `{name, kind, params}` for every name
+-- the source assigned or defined (one entry per name, the last definition
+-- winning); a failing run defines nothing.
 -- `opts.yield`: called between statements; returning `false` cancels the run.
 function M.run(source, env, opts)
     local yield = opts and opts.yield
@@ -110,10 +113,11 @@ function M.run(source, env, opts)
         return fail(perr)
     end
     if #list == 0 then
-        return { kind = "value", canonical = "", display = "", truncated = false, empty = true }
+        return { kind = "value", canonical = "", display = "", truncated = false, empty = true, defined = {} }
     end
     local snap = env:snapshot()
     local last
+    local defined, at = {}, {}
     for i, stmt in ipairs(list) do
         if i > 1 and yield and yield() == false then
             env:restore(snap)
@@ -125,7 +129,16 @@ function M.run(source, env, opts)
             return fail(err, err.line or stmt.line)
         end
         last = out
+        if stmt.kind == "assign" or stmt.kind == "funcdef" then
+            local def = { name = stmt.name, kind = stmt.kind == "assign" and "var" or "func" }
+            if def.kind == "func" then
+                def.params = stmt.params
+            end
+            defined[at[stmt.name] or (#defined + 1)] = def
+            at[stmt.name] = at[stmt.name] or #defined
+        end
     end
+    last.defined = defined
     return last
 end
 
