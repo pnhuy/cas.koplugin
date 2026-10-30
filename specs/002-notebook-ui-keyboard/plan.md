@@ -138,3 +138,10 @@ Phase 2 and 3 are both P1; keyboard comes first because the notebook cannot be e
 ## Complexity Tracking
 
 No constitution violations to justify.
+
+## Decision: the 001 screens (T058)
+
+The 001 Calculator and Graph screens are **kept**, reachable from the notebook menu as "Classic calculator" and
+"Classic graph". The Tools → Calculator entry opens the notebook. Reason: they are small, tested, still used as the
+graph viewer's base, and removing them is a separate, unrequested change (Constitution IX). Revisit if they cause
+maintenance cost.

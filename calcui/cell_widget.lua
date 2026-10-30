@@ -21,6 +21,13 @@ local _ = require("gettext")
 
 local Screen = Device.screen
 
+-- cell_status is pure and holds the English labels; listing them here lets the
+-- gettext extractor see each one.
+local STATUS_LABELS = {
+    Idle = _("Idle"), Editing = _("Editing"), Running = _("Running"),
+    Done = _("Done"), Error = _("Error"), Stale = _("Stale"),
+}
+
 local CellWidget = VerticalGroup:extend{
     cell = nil,
     width = nil,
@@ -57,7 +64,7 @@ function CellWidget:init()
     local is_note = cell.type == "text"
     local row = {
         {
-            text = is_note and _("Note") or (cell_status.input_label(cell) .. "  " .. status.symbol .. " " .. _(status.label)),
+            text = is_note and _("Note") or (cell_status.input_label(cell) .. "  " .. status.symbol .. " " .. (STATUS_LABELS[status.label] or status.label)),
             align = "left",
             callback = guard.wrap(function() view.on_edit(cell.id) end),
         },

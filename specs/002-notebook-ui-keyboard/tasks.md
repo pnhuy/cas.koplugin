@@ -164,13 +164,13 @@
 
 ## Phase 9: Polish and Cross-Cutting
 
-- [ ] T053 [P] Fuzz and limit specs `spec/calcnb/fuzz_spec.lua`: at least 50 invalid or hostile cell sources (SC-006) never throw; 200-char typing never evaluates (SC-004, pure editor-state test)
-- [ ] T054 [P] Gettext check: run a script (Lua or shell, no Python) listing every `_("...")` in the new files and confirm none are built by concatenation
-- [ ] T055 Run `busted` and `luacheck` over the whole tree; record the actual counts in `README.md` and `quickstart.md`
-- [ ] T056 Measure in the emulator: 100-cell scroll responsiveness (SC-013), 4-function plot time (SC-010), tap latency while plotting; record numbers and state that device timing is unmeasured
-- [ ] T057 Update `README.md`: notebook usage, keyboard, language, file location, limitations (no `diff`/`solve`/etc., no outputs persisted, no gestures), minimum KOReader version; remove stale 001 text
-- [ ] T058 Decide and record the fate of the 001 Calculator and Graph screens (retire from the notebook Menu or keep) in `plan.md`
-- [ ] T059 Run the full `quickstart.md` checklist, update its results table honestly, and list what remains unverified (rotation, physical keys, grayscale and refresh behavior, real devices)
+- [X] T053 [P] Fuzz and limit specs `spec/calcnb/fuzz_spec.lua`: at least 50 invalid or hostile cell sources (SC-006) never throw; 200-char typing never evaluates (SC-004, pure editor-state test)
+- [X] T054 [P] Gettext check: run a script (Lua or shell, no Python) listing every `_("...")` in the new files and confirm none are built by concatenation
+- [X] T055 Run `busted` and `luacheck` over the whole tree; record the actual counts in `README.md` and `quickstart.md`
+- [X] T056 Measure in the emulator: 100-cell scroll responsiveness (SC-013), 4-function plot time (SC-010), tap latency while plotting; record numbers and state that device timing is unmeasured
+- [X] T057 Update `README.md`: notebook usage, keyboard, language, file location, limitations (no `diff`/`solve`/etc., no outputs persisted, no gestures), minimum KOReader version; remove stale 001 text
+- [X] T058 Decide and record the fate of the 001 Calculator and Graph screens (retire from the notebook Menu or keep) in `plan.md`
+- [X] T059 Run the full `quickstart.md` checklist, update its results table honestly, and list what remains unverified (rotation, physical keys, grayscale and refresh behavior, real devices)
 
 ---
 

@@ -1,6 +1,6 @@
 # Quickstart: Verifying the Notebook
 
-Nothing here has been run yet; results are recorded below as each phase is verified.
+Automated results and emulator results are recorded in the table at the end; what was not checked is listed with each row and under "Device".
 
 ## Automated (pure Lua)
 
@@ -48,3 +48,7 @@ Grayscale legibility, refresh behavior, physical keys, page-turn buttons, and ti
 | 2026-10-30 | T049 US5 in the emulator: add above/below, duplicate, move, delete with and without confirmation, copy source/result, insert result into the edited cell, status labels, clear all outputs with confirmation | Pass per user ("it works now"; the first try ran a stale emulator without the new menu item). No per-cell action row was added; the `⋯` menu holds the actions. Not checked: landscape, device |
 
 | 2026-10-30 | T052 US6 in the emulator: add a note, save and restore it, Run all skips it; graph viewer Inspect at x = 2 (`x^2` = 4), undefined points, invalid x | Pass per user ("all works"). Not checked: landscape, device |
+| 2026-10-30 | T053/T054/T055 automated: `busted` over the whole tree; `luacheck` over `main.lua _meta.lua calccas.lua calcplot.lua calccas calcplot calcnb calcui spec`; fuzz spec (about 80 hostile sources, invalid UTF-8, 200 edits evaluate nothing); gettext scan of `calcui/` and `main.lua` | Run: 641 successes / 0 failures / 0 errors; luacheck 0 warnings / 0 errors in 90 files. Gettext: 112 literal `_()` calls; the one dynamic key (`_(status.label)`) was replaced by a literal table in `cell_widget.lua` |
+| 2026-10-30 | T056 timings in the emulator (540×720), generated 100-cell notebook (90 `a = n`/`f(x)` cells, 10 two-curve plots): paging/scrolling, Run all, a 4-function plot, taps while plotting | Per user: scrolling fast, Run all fast, plot fast, no tap latency. Not measured with a stopwatch, so no numbers; desktop timing says nothing about e-reader devices (SC-010, SC-013 unmeasured on hardware) |
+| 2026-10-30 | T059 log review (`kodev-run.log`, 5628 lines, including the 100-cell run) | No plugin errors or tracebacks; only two emulator errors registering unrelated user fonts (`NFM.ttf`, `material-design-icons.ttf`) |
+| 2026-10-30 | T059 still unverified | `.sdr` checksums with a book open (step 11), rotation with the keyboard open (step 12), landscape, grayscale, refresh behavior, physical keys and page-turn buttons, device fonts, real-device timing |
