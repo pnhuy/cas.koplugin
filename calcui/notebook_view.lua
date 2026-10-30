@@ -27,6 +27,7 @@ local notebook_layout = require("calcui.notebook_layout")
 local completion_session = require("calcnb.completion_session")
 local keyboard_layout = require("calcnb.keyboard_layout")
 local run_queue = require("calcnb.run_queue")
+local strip_keys = require("calcnb.strip_keys")
 local strip_sizing = require("calcui.strip_sizing")
 local SuggestionStrip = require("calcui.suggestion_strip")
 local _ = require("gettext")
@@ -328,16 +329,14 @@ end
 
 -- Keys for the strip while it is shown (see CellEditor:onKeyPress); true when taken.
 function NotebookView:strip_key(key)
-    if not self:strip_shown() then
-        return false
-    end
-    if key["Press"] or key["Tab"] then
+    local action = strip_keys.action(key, self:strip_shown())
+    if action == "accept" then
         return self:onAcceptSuggestion()
-    elseif key["Back"] then
+    elseif action == "dismiss" then
         return self:onCloseNotebook()
-    elseif key["RPgFwd"] or key["LPgFwd"] then
+    elseif action == "next" then
         return self:onNextPage()
-    elseif key["RPgBack"] or key["LPgBack"] then
+    elseif action == "prev" then
         return self:onPrevPage()
     end
     return false

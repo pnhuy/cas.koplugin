@@ -86,7 +86,7 @@ busted
 luacheck main.lua _meta.lua calccas.lua calcplot.lua calccas calcplot calcnb calcui spec
 ```
 
-Last run: `busted` 641 successes / 0 failures / 0 errors; `luacheck` 0 warnings / 0 errors in 90 files.
+Last run: `busted` 971 successes / 0 failures / 0 errors; `luacheck` 0 warnings / 0 errors in 113 files.
 
 Layers: pure `calcnb/` (notebook model, statements, persistence logic) → engines `calccas/` and `calcplot/` →
 `calcui/` widgets and `main.lua`. The engines and `calcnb/` do not require KOReader.

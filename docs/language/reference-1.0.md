@@ -18,8 +18,12 @@ parser into a tree and evaluated by the plugin's own evaluator. **Input is never
 `loadstring`, and no access to Lua names. Text such as `os.execute("x")` is a syntax error.
 
 Statements run top to bottom. A variable or function defined by a statement is visible to the statements after it, and to
-later cells. If a statement fails, the statements before it keep their effect, the failing line is reported, and nothing after
-it runs.
+later cells. A cell runs as a whole: if a statement fails, the failing line is reported, nothing after it runs, and
+the cell leaves no definitions behind (the environment is restored to what it was before the cell ran).
+
+A name stays defined in the notebook until **Run all** or a restart, even if the cell that defined it is edited or deleted
+(as in Jupyter); the suggestions list only the names of each cell's last successful run. Run all starts from an empty
+environment, so it is the way to check that a notebook does not depend on a removed definition.
 
 ## 2. Lexical elements
 
@@ -135,8 +139,10 @@ more is a `too_complex` error. <!-- case: G-53-c -->
 
 - Integers, decimals and scientific notation are read as **exact rationals**: `0.1 + 0.2` is `3/10`, `1e-3` is `1/1000`,
   `1e3` is `1000`. <!-- case: G-62-a --> <!-- case: G-62-b -->
-- Arithmetic on exact values stays exact. Results of `sin`, `cos`, `tan`, `exp`, `log` and the constants are approximate and
-  shown with `≈`, for example `pi ≈ 3.14159265`. <!-- case: G-60-a -->
+- Arithmetic on exact values stays exact. `sin`, `cos` and `tan` are exact at the multiples of `pi/12` whose value is
+  rational (`sin(pi)` is 0, `sin(pi/6)` is 1/2, `cos(pi/3)` is 1/2, `tan(pi/4)` is 1), `log(e)` is 1, and `sqrt(a)^2` is `a`.
+  Other results of `sin`, `cos`, `tan`, `exp`, `log` and the constants are approximate and shown with `≈`, for example
+  `pi ≈ 3.14159265`. <!-- case: G-60-a -->
 - A value too large for the exact range becomes approximate (`1e30` is shown as `1e+30`). Beyond the range of a double
   (`1e400`, `10^400`) the result is an `overflow` error. <!-- case: G-62-c -->
 - The two sides of a relation are exact or approximate independently.
@@ -193,7 +199,7 @@ Names that merely contain a reserved word (`myfunc`) are free. <!-- case: G-27-e
 | `sqrt(-1)` | `domain` <!-- case: G-63-b --> |
 | `log(0)`, `log(-1)` | `domain` |
 | `tan(pi/2)` | `domain` (tan has a pole) |
-| `(-8)^(1/3)` | `domain` (fractional power of a negative number) |
+| `(-8)^(1/3)` | `domain` (fractional power of a negative number, even though a real cube root exists) |
 | `0^0` | `undefined` |
 | `exp(1000)`, `10^400`, `1e400` | `overflow` |
 

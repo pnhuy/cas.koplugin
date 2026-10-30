@@ -154,9 +154,9 @@
 ## Phase 7: Polish & Cross-Cutting
 
 - [ ] T066 [P] Add large-expression and resource-limit tests (500-char, deeply nested, 10^6-term expansion attempt, pathological `sin(1/x)` plot) with time ceilings in `spec/calccas/limits_spec.lua` and `spec/calcplot/limits_spec.lua`
-- [ ] T067 [P] Add fuzz-style no-throw test for `calccas` over 2000 deterministic pseudo-random strings in `spec/calccas/fuzz_spec.lua`
-- [ ] T068 [P] Run `luacheck .` and fix all warnings across the repository
-- [ ] T069 [P] Run the whole Busted suite, then record the actual pass/fail counts in `README.md` "Development" section
+- [X] T067 [P] Add fuzz-style no-throw test for `calccas` over 2000 deterministic pseudo-random strings in `spec/calccas/init_spec.lua`
+- [X] T068 [P] Run `luacheck .` and fix all warnings across the repository
+- [X] T069 [P] Run the whole Busted suite, then record the actual pass/fail counts in `README.md` "Development" section
 - [ ] T070 [P] Measure evaluate/simplify and 4-function plot timings against SC-004/SC-005 on the emulator and, if available, a real device; record in `specs/001-calculator-cas-graphing/quickstart.md` notes
 - [ ] T071 Finalize `README.md` (purpose, install, usage, syntax and ambiguity rules, limits, supported KOReader version, platform notes) so it matches implemented behavior
 - [ ] T072 Add gettext template extraction note and ensure all user strings are wrapped in `_()` across `calcui/` and `main.lua`

@@ -317,13 +317,14 @@ local function make_parser(tokens, text, lim, funcs, known)
                 return call
             end
             if nxt.type == "lparen" then
-                if CONSTANTS[name] or known[name] or #name == 1 then
+                if CONSTANTS[name] or known[name] then
                     i = i - 1
                     local from = i
                     i = i + 1
                     missing_times(from)
                 end
-                fail("syntax", "unknown function `" .. name .. "`", tok)
+                fail("syntax", "unknown function `" .. name .. "`; a function must be defined first, "
+                    .. "for example `" .. name .. "(t) = t^2` in an earlier line or cell", tok)
             end
             if CONSTANTS[name] then
                 return ast.const(name)

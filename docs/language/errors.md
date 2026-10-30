@@ -29,7 +29,8 @@ what tests match. Positions are byte offsets in the cell, lines are 1-based.
 Rules:
 
 1. A message names the construct and, where one exists, the replacement. It never shows internal table names.
-2. An error in one statement of a cell reports that statement's line; statements before it keep their effect.
+2. An error in one statement of a cell reports that statement's line; the cell's earlier statements are undone too, so a failed
+   cell defines nothing.
 3. Position and line refer to the original text, including lines that were continued.
 4. Messages for a given input are stable inside a language major version; tests match fragments, not whole strings, so wording
    can be improved without a version bump.

@@ -171,6 +171,15 @@ local reduce
 
 local function reduce_pow(node, env)
     local b, e = reduce(node.base, env), reduce(node.exp, env)
+    if exact_num(e) and e.d == 1 then
+        if e.n == 1 then
+            return b
+        end
+        -- sqrt(a)^(2k) = a^k for an exact positive a (sqrt(-a) already failed)
+        if e.n % 2 == 0 and b.t == "fn" and b.name == "sqrt" and exact_num(b.arg) then
+            return reduce_pow({ t = "pow", base = b.arg, exp = ast.num(e.n / 2) }, env)
+        end
+    end
     if not (exact_num(b) and exact_num(e)) then
         return ast.pow(b, e)
     end
@@ -199,9 +208,73 @@ local function reduce_pow(node, env)
     return ast.pow(b, e)
 end
 
+-- The angle `a` as a count m of pi/12 (0 <= m < 24) when `a` is an exact
+-- rational multiple of pi with denominator dividing 12, else nil.
+local function twelfths_of_pi(a)
+    local k
+    if a.t == "const" and a.name == "pi" then
+        k = { n = 1, d = 1 }
+    elseif a.t == "mul" and #a.args == 2 and exact_num(a.args[1]) and a.args[2].t == "const"
+        and a.args[2].name == "pi" then
+        k = a.args[1]
+    else
+        return nil
+    end
+    if abs(k.n) > 1e12 or (12 * k.n) % k.d ~= 0 then
+        return nil
+    end
+    return (12 * k.n / k.d) % 24
+end
+
+-- Exact sin, cos and tan at the multiples of pi/12 whose value is rational.
+local EXACT_SIN = { [0] = 0, [2] = 1 / 2, [6] = 1, [10] = 1 / 2, [12] = 0, [14] = -1 / 2, [18] = -1, [22] = -1 / 2 }
+local EXACT_COS = { [0] = 1, [4] = 1 / 2, [6] = 0, [8] = -1 / 2, [12] = -1, [16] = -1 / 2, [18] = 0, [20] = 1 / 2 }
+local EXACT_TAN = { [0] = 0, [3] = 1, [9] = -1 }
+
+local function exact_trig(name, a)
+    local m = twelfths_of_pi(a)
+    if not m then
+        return nil
+    end
+    local v
+    if name == "sin" then
+        v = EXACT_SIN[m]
+    elseif name == "cos" then
+        v = EXACT_COS[m]
+    elseif name == "tan" then
+        v = EXACT_TAN[m % 12]
+    end
+    if v == nil then
+        return nil
+    end
+    if v == 1 / 2 or v == -1 / 2 then
+        return ast.num(v < 0 and -1 or 1, 2)
+    end
+    return ast.num(v)
+end
+
+-- Exact value of a function the float stage would only approximate (sin(pi),
+-- log(e)), or nil. `arg` is already reduced.
+local function exact_value(name, arg)
+    if name == "sin" or name == "cos" or name == "tan" then
+        return exact_trig(name, arg)
+    end
+    if name == "log" and arg.t == "const" and arg.name == "e" then
+        return ast.num(1)
+    end
+end
+
+function M.exact_value(name, arg)
+    return exact_value(name, arg)
+end
+
 local function reduce_fn(node, env)
     local a = reduce(node.arg, env)
     local name = node.name
+    local known = exact_value(name, a)
+    if known then
+        return known
+    end
     if exact_num(a) then
         if name == "sqrt" then
             if a.n < 0 then

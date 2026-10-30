@@ -7,6 +7,7 @@
 
 local ast = require("calccas.ast")
 local errors = require("calccas.errors")
+local eval = require("calccas.eval")
 local limits = require("calccas.limits")
 local printer = require("calccas.printer")
 
@@ -214,13 +215,17 @@ function simplify_once(node, notes)
         local base, exp = simplify_once(node.base, notes), simplify_once(node.exp, notes)
         if is_one(exp) then
             return base
+        elseif is_int(exp) and exp.n % 2 == 0 and base.t == "fn" and base.name == "sqrt"
+            and base.arg.t == "num" and not base.arg.approx then
+            return simplify_once(ast.pow(base.arg, ast.num(exp.n / 2)), notes)
         elseif is_zero(exp) and base.t ~= "num" then
             notes[nonzero_note(base)] = true
             return ast.num(1)
         end
         return ast.pow(base, exp)
     elseif t == "fn" then
-        return ast.fn(node.name, simplify_once(node.arg, notes))
+        local arg = simplify_once(node.arg, notes)
+        return eval.exact_value(node.name, arg) or ast.fn(node.name, arg)
     end
     return node
 end
