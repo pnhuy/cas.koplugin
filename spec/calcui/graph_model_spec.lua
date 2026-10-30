@@ -210,3 +210,56 @@ describe("calcui.graph_model notebook graphs", function()
         assert.are.same({ { label = "sin(x)", style = "solid" }, { label = "cos(x)", style = "dashed" } }, legend)
     end)
 end)
+
+describe("calcui.graph_model inspection", function()
+    local calccas = require("calccas")
+    local function state_of(...)
+        local fns = {}
+        for i, text in ipairs({ ... }) do
+            fns[i] = { label = text, ast = assert(calccas.parse(text)) }
+        end
+        return model.from_graph({ functions = fns })
+    end
+
+    it("gives x, y and the function for a value", function()
+        local rows = assert(model.inspect(state_of("x^2"), "2"))
+        assert.are.equal(1, #rows)
+        assert.are.equal("x^2", rows[1].label)
+        assert.are.equal(2, rows[1].x)
+        assert.are.equal(4, rows[1].y)
+        assert.are.equal("4", rows[1].text)
+    end)
+
+    it("accepts a constant expression for x", function()
+        local rows = assert(model.inspect(state_of("x"), "2*pi"))
+        assert.is_true(math.abs(rows[1].y - 2 * math.pi) < 1e-9)
+    end)
+
+    it("reports undefined where the function has no value", function()
+        local rows = assert(model.inspect(state_of("1/x", "sqrt(x)"), "0"))
+        assert.are.equal("undefined", rows[1].text)
+        assert.is_nil(rows[1].y)
+        local neg = assert(model.inspect(state_of("sqrt(x)"), "-1"))
+        assert.are.equal("undefined", neg[1].text)
+    end)
+
+    it("covers every visible function and skips hidden ones", function()
+        local state = state_of("x", "2*x")
+        model.toggle(state, state.functions[1].id)
+        local rows = assert(model.inspect(state, "3"))
+        assert.are.equal(1, #rows)
+        assert.are.equal(6, rows[1].y)
+    end)
+
+    it("rejects an x that is not a number", function()
+        local rows, err = model.inspect(state_of("x"), "abc")
+        assert.is_nil(rows)
+        assert.are.equal("range", err.kind)
+        assert.is_nil(model.inspect(state_of("x"), ""))
+    end)
+
+    it("returns no rows when nothing is plotted", function()
+        local rows = assert(model.inspect(model.new_state(), "1"))
+        assert.are.same({}, rows)
+    end)
+end)

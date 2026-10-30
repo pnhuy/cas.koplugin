@@ -254,14 +254,15 @@ function NotebookView:onPrevPage()
     return true
 end
 
-function NotebookView:add_cell(after_id)
+function NotebookView:add_cell(after_id, cell_type)
     self:sync()
     local nb = self.nb
     local cell, err
     if after_id then
-        cell, err = nb:add_below(after_id)
+        local _, i = nb:get(after_id)
+        cell, err = nb:add((i or #nb.cells) + 1, cell_type)
     else
-        cell, err = nb:add(self.active and (nb:index_of(self.active) + 1) or (#nb.cells + 1))
+        cell, err = nb:add(self.active and (nb:index_of(self.active) + 1) or (#nb.cells + 1), cell_type)
     end
     if not cell then
         UIManager:show(InfoMessage:new{ text = err.message })
@@ -377,6 +378,7 @@ function NotebookView:show_cell_menu(id)
                 self:rebuild()
             end),
             item(_("Add cell below"), function() self:add_cell(id) end),
+            item(_("Add note below"), function() self:add_cell(id, "text") end),
             item(_("Duplicate"), function()
                 nb:duplicate(id)
                 self:rebuild()

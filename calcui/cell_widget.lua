@@ -53,19 +53,24 @@ function CellWidget:init()
     local face = Font:getFace("cfont", 20)
     local status = cell_status.describe(cell.status, self.editing)
 
+    -- a note has no run, status or output: just a label and the menu
+    local is_note = cell.type == "text"
+    local row = {
+        {
+            text = is_note and _("Note") or (cell_status.input_label(cell) .. "  " .. status.symbol .. " " .. _(status.label)),
+            align = "left",
+            callback = guard.wrap(function() view.on_edit(cell.id) end),
+        },
+    }
+    if not is_note then
+        row[#row + 1] = { text = _("Run"), width = Screen:scaleBySize(80), callback = guard.wrap(function() view.on_run(cell.id) end) }
+    end
+    row[#row + 1] = { text = "⋯", width = Screen:scaleBySize(60), callback = guard.wrap(function() view.on_menu(cell.id) end) }
     local header = ButtonTable:new{
         width = inner,
         sep_width = 0,
         show_parent = self.show_parent,
-        buttons = {{
-            {
-                text = cell_status.input_label(cell) .. "  " .. status.symbol .. " " .. _(status.label),
-                align = "left",
-                callback = guard.wrap(function() view.on_edit(cell.id) end),
-            },
-            { text = _("Run"), width = Screen:scaleBySize(80), callback = guard.wrap(function() view.on_run(cell.id) end) },
-            { text = "⋯", width = Screen:scaleBySize(60), callback = guard.wrap(function() view.on_menu(cell.id) end) },
-        }},
+        buttons = { row },
     }
 
     local source
@@ -89,7 +94,7 @@ function CellWidget:init()
         self.editor = editor
         source = editor
     else
-        local text = cell.source ~= "" and cell.source or _("(empty cell)")
+        local text = cell.source ~= "" and cell.source or (is_note and _("(empty note)") or _("(empty cell)"))
         source = TapArea:new{
             callback = guard.wrap(function() view.on_edit(cell.id) end),
             FrameContainer:new{
@@ -106,7 +111,7 @@ function CellWidget:init()
     group[#group + 1] = FrameContainer:new{ bordersize = 0, padding = 0, padding_left = pad, header }
     group[#group + 1] = FrameContainer:new{ bordersize = 0, padding = 0, padding_left = pad, source }
 
-    local text = output_text(cell)
+    local text = not is_note and output_text(cell) or nil
     if text then
         group[#group + 1] = VerticalSpan:new{ width = Screen:scaleBySize(6) }
         group[#group + 1] = FrameContainer:new{

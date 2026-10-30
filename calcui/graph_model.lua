@@ -213,4 +213,34 @@ function M.parse_range(texts, auto_y)
     return viewport.new(values[1], values[2], values[3] or -10, values[4] or 10, auto_y)
 end
 
+local function finite(v)
+    return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge
+end
+
+-- Value of every visible function at the x given as text. Returns rows
+-- `{label, x, y, text}` (y is nil and text "undefined" where there is no
+-- value), or nil + error when x is not a number.
+function M.inspect(state, x_text)
+    local x = number_of((x_text or ""):match("^%s*(.-)%s*$"))
+    if not finite(x) then
+        return nil, { kind = "range", message = "x is not a number" }
+    end
+    local rows = {}
+    for _, entry in ipairs(state.functions) do
+        if entry.visible then
+            local fn = M.compiled(entry)
+            local ok, y = false, nil
+            if fn then
+                ok, y = pcall(fn, x)
+            end
+            local row = { label = entry.label or entry.text, x = x, text = "undefined" }
+            if ok and finite(y) then
+                row.y, row.text = y, string.format("%.10g", y)
+            end
+            rows[#rows + 1] = row
+        end
+    end
+    return rows
+end
+
 return M

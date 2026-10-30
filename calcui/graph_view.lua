@@ -9,6 +9,7 @@ local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
+local InputDialog = require("ui/widget/inputdialog")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local ButtonTable = require("ui/widget/buttontable")
 local Size = require("ui/size")
@@ -89,6 +90,7 @@ function GraphView:_build()
             { text = _("Range"), callback = action(self._range) },
             { text = self.state.grid and _("Grid: on") or _("Grid: off"), callback = action(self._toggle, "grid") },
             { text = self.state.axes ~= false and _("Axes: on") or _("Axes: off"), callback = action(self._toggle, "axes") },
+            { text = _("Inspect"), callback = action(self._inspect) },
         },
     }
     if not self.notebook then
@@ -346,6 +348,37 @@ function GraphView:_range(pending)
                 },
             },
         },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+-- Asks for an x value and shows what each visible function gives there.
+function GraphView:_inspect()
+    local dialog
+    local function submit()
+        local rows, err = model.inspect(self.state, dialog:getInputText())
+        if not rows then
+            UIManager:show(InfoMessage:new{ text = err.message })
+            return
+        end
+        UIManager:close(dialog)
+        local lines = {}
+        for i, row in ipairs(rows) do
+            lines[i] = row.label .. "  (x = " .. string.format("%.10g", row.x) .. "):  " .. row.text
+        end
+        if #lines == 0 then
+            lines[1] = _("No function is shown")
+        end
+        UIManager:show(InfoMessage:new{ text = table.concat(lines, "\n") })
+    end
+    dialog = InputDialog:new{
+        title = _("Value at x"),
+        input_hint = "x",
+        buttons = {{
+            { text = _("Cancel"), callback = function() UIManager:close(dialog) end },
+            { text = _("Evaluate"), is_enter_default = true, callback = guard.wrap(submit) },
+        }},
     }
     UIManager:show(dialog)
     dialog:onShowKeyboard()

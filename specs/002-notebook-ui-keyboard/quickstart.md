@@ -46,3 +46,5 @@ Grayscale legibility, refresh behavior, physical keys, page-turn buttons, and ti
 | 2026-10-30 | T046 US4 in the emulator: save and restart, autosave on close, truncated file, empty file, read-only settings directory (failed save), delete saved notebook | Pass per user ("all works"). Not checked: `.sdr` checksums before and after, log review, rotation, device |
 
 | 2026-10-30 | T049 US5 in the emulator: add above/below, duplicate, move, delete with and without confirmation, copy source/result, insert result into the edited cell, status labels, clear all outputs with confirmation | Pass per user ("it works now"; the first try ran a stale emulator without the new menu item). No per-cell action row was added; the `⋯` menu holds the actions. Not checked: landscape, device |
+
+| 2026-10-30 | T052 US6 in the emulator: add a note, save and restore it, Run all skips it; graph viewer Inspect at x = 2 (`x^2` = 4), undefined points, invalid x | Pass per user ("all works"). Not checked: landscape, device |

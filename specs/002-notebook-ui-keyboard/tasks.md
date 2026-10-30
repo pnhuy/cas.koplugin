@@ -156,9 +156,9 @@
 
 **Goal**: Plain-text note cells and x-value inspection in the graph viewer. Start only after phases 3-7 are verified.
 
-- [ ] T050 [P] [US6] Write failing specs: text cells are skipped by Run all, persisted and restored (`spec/calcnb/notebook_spec.lua`, `spec/calcnb/store_logic_spec.lua`); inspection returns `y` or "undefined" (`spec/calcui/graph_model_spec.lua`)
-- [ ] T051 [US6] Implement text cells in `calcnb/notebook.lua`, `calcui/cell_widget.lua`, and inspection in `calcnb`/`calcui/graph_view.lua`
-- [ ] T052 [US6] Emulator check of US6 scenarios 1-2; record in `quickstart.md`
+- [X] T050 [P] [US6] Write failing specs: text cells are skipped by Run all, persisted and restored (`spec/calcnb/notebook_spec.lua`, `spec/calcnb/store_logic_spec.lua`); inspection returns `y` or "undefined" (`spec/calcui/graph_model_spec.lua`)
+- [X] T051 [US6] Implement text cells in `calcnb/notebook.lua`, `calcui/cell_widget.lua`, and inspection in `calcnb`/`calcui/graph_view.lua`
+- [X] T052 [US6] Emulator check of US6 scenarios 1-2; record in `quickstart.md`
 
 ---
 
