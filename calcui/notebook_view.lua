@@ -16,6 +16,7 @@ local GraphView = require("calcui.graph_view")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local Keyboard = require("calcui.keyboard")
+local store = require("calcui.notebook_store")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
@@ -30,12 +31,18 @@ local Screen = Device.screen
 local ESTIMATED_CELL_H = 140
 
 local NotebookView = InputContainer:extend{
-    nb = nil, -- calcnb.notebook
+    session = nil, -- notebook_store session: { nb, dirty, scroll, problems }
+    nb = nil, -- calcnb.notebook (session.nb)
     handlers = nil, -- { calculator = fn, graph = fn } optional entries to the classic screens
 }
 
 function NotebookView:init()
+    self.nb = self.session.nb
     self.top = 1
+    local scroll = self.session.scroll
+    if scroll and self.nb:index_of(scroll.top_id) then
+        self.top = self.nb:index_of(scroll.top_id)
+    end
     self.active = nil -- id of the cell being edited
     self.heights = {}
     self.queue = run_queue.new()
@@ -45,9 +52,43 @@ function NotebookView:init()
         self.key_events = {
             NextPage = { { Input.group.PgFwd }, event = "NextPage" },
             PrevPage = { { Input.group.PgBack }, event = "PrevPage" },
+            CloseNotebook = { { Input.group.Back }, event = "CloseNotebook" },
         }
     end
     self:rebuild()
+    if #(self.session.problems or {}) > 0 then
+        UIManager:show(InfoMessage:new{
+            text = _("The saved notebook had problems and was repaired:") .. "\n- "
+                .. table.concat(self.session.problems, "\n- ", 1, math.min(#self.session.problems, 5)),
+        })
+        self.session.problems = {}
+    end
+end
+
+-- The first cell of the page, which is what a saved scroll position names.
+function NotebookView:scroll_position()
+    local cell = self.nb.cells[self.top]
+    return cell and { top_id = cell.id, offset = 0 } or nil
+end
+
+-- Writes the notebook if it has unsaved changes. Shows a message on failure;
+-- the notebook stays in memory and dirty, so nothing is lost.
+function NotebookView:autosave()
+    if not self.session.dirty:is_dirty() then
+        return true
+    end
+    self:sync()
+    local ok, message = store.save(self.session, self:scroll_position())
+    if not ok then
+        UIManager:show(InfoMessage:new{ text = message })
+    end
+    return ok
+end
+
+function NotebookView:save_now()
+    self:sync()
+    local ok, message = store.save(self.session, self:scroll_position())
+    UIManager:show(InfoMessage:new{ text = ok and _("Notebook saved") or message, timeout = ok and 1 or nil })
 end
 
 -- Copies the live editor text into the model; call before anything that
@@ -84,7 +125,7 @@ function NotebookView:rebuild()
     local toolbar = bar(w, {
         { text = nb.title ~= "" and nb.title or _("Notebook"), align = "left", callback = function() end },
         { text = "+", width = small, callback = guard.wrap(function() self:add_cell() end) },
-        { text = _("Save"), width = Screen:scaleBySize(90), enabled = false, callback = function() end },
+        { text = _("Save"), width = Screen:scaleBySize(90), callback = guard.wrap(function() self:save_now() end) },
         { text = "≡", width = small, callback = guard.wrap(function() self:show_menu() end) },
         { text = "✕", width = small, callback = guard.wrap(function() self:close() end) },
     })
@@ -272,6 +313,7 @@ function NotebookView:open_graph(id)
     GraphView.show(graph_model.from_graph(cell.output.graph, cell.viewport), nil, {
         on_close = function(state)
             cell.viewport = graph_model.to_viewport(state)
+            self.session.dirty:mark()
             self:rebuild()
         end,
     })
@@ -383,6 +425,17 @@ function NotebookView:show_menu()
     if self.handlers and self.handlers.graph then
         rows[#rows + 1] = item(_("Classic graph"), self.handlers.graph)
     end
+    rows[#rows + 1] = item(_("Delete saved notebook"), function()
+        store.delete(self.session, function(ok)
+            if not ok then
+                UIManager:show(InfoMessage:new{ text = _("Could not delete the saved notebook") })
+                return
+            end
+            self.queue:cancel()
+            self.nb, self.active, self.top, self.heights = self.session.nb, nil, 1, {}
+            self:rebuild()
+        end)
+    end)
     dialog = ButtonDialog:new{ buttons = rows }
     UIManager:show(dialog)
 end
@@ -390,9 +443,25 @@ end
 function NotebookView:close()
     self:sync()
     self.queue:cancel()
+    UIManager:close(self) -- onCloseWidget saves and frees
+end
+
+function NotebookView:onCloseNotebook()
+    self:close()
+    return true
+end
+
+-- Every way of leaving (Close, Back, KOReader quitting) ends here.
+function NotebookView:onCloseWidget()
+    self.queue:cancel()
+    self:autosave()
     self:release_graphs()
     GraphOutput.clear_cache()
-    UIManager:close(self)
+end
+
+-- Suspend and exit: keep the file current without closing.
+function NotebookView:onFlushSettings()
+    self:autosave()
 end
 
 -- Rotation or window resize: sizes were computed for the old screen.
@@ -406,8 +475,8 @@ function NotebookView:onSetDimensions()
     self:onScreenResize()
 end
 
-function NotebookView.show(nb, handlers)
-    UIManager:show(NotebookView:new{ nb = nb, handlers = handlers })
+function NotebookView.show(session, handlers)
+    UIManager:show(NotebookView:new{ session = session, handlers = handlers })
 end
 
 return NotebookView

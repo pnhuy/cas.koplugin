@@ -1,10 +1,10 @@
 local CalculatorView = require("calcui.calculator_view")
 local GraphView = require("calcui.graph_view")
-local Notebook = require("calcnb.notebook")
 local NotebookView = require("calcui.notebook_view")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local graph_model = require("calcui.graph_model")
 local guard = require("calcui.guard")
+local store = require("calcui.notebook_store")
 local settings = require("calcui.settings")
 local _ = require("gettext")
 
@@ -39,12 +39,12 @@ local showCalculator = guard.wrap(function()
     CalculatorView.show(session, handlers)
 end)
 
--- The notebook lives for the KOReader process until persistence (US4) lands.
-local notebook
+-- Loaded from disk on first use, then kept for the KOReader process.
+local nb_session
 
 local showNotebook = guard.wrap(function()
-    notebook = notebook or Notebook.new(_("Notebook"))
-    NotebookView.show(notebook, {
+    nb_session = nb_session or store.load()
+    NotebookView.show(nb_session, {
         calculator = showCalculator,
         graph = function()
             GraphView.show(graph_state(), function() end)

@@ -127,16 +127,16 @@
 
 ### Tests
 
-- [ ] T040 [P] [US4] Write failing specs `spec/calcnb/store_logic_spec.lua` for `contracts/notebook-file.md`: round trip of title, order, ids, types, sources, viewports and scroll; wrong type, missing keys, non-string sources, invalid UTF-8, duplicate/missing ids, over-limit cells and text, unknown newer `version`; always returns a usable notebook plus problems; `to_data` yields plain tables only
-- [ ] T041 [P] [US4] Write failing specs `spec/calcnb/dirty_spec.lua` for `calcnb/dirty.lua`: dirty flag set by edits and structure changes, cleared by a successful save, kept by a failed save
+- [X] T040 [P] [US4] Write failing specs `spec/calcnb/store_logic_spec.lua` for `contracts/notebook-file.md`: round trip of title, order, ids, types, sources, viewports and scroll; wrong type, missing keys, non-string sources, invalid UTF-8, duplicate/missing ids, over-limit cells and text, unknown newer `version`; always returns a usable notebook plus problems; `to_data` yields plain tables only
+- [X] T041 [P] [US4] Write failing specs `spec/calcnb/dirty_spec.lua` for `calcnb/dirty.lua`: dirty flag set by edits and structure changes, cleared by a successful save, kept by a failed save
 
 ### Implementation
 
-- [ ] T042 [US4] Implement `calcnb/store_logic.lua` and `calcnb/dirty.lua`
-- [ ] T043 [US4] Implement `calcui/notebook_store.lua` (`LuaSettings` load/save with `pcall`, `logger.warn`, failure message, keeps notebook dirty on failure, delete with `ConfirmBox`)
-- [ ] T044 [US4] Wire Save, autosave on Close and on `onCloseWidget`, problems message on load, restore scroll position, outputs absent after load; Menu items New, Open, Save as map to the single default notebook (or are hidden) per the spec assumption
-- [ ] T045 [US4] Implement `onScreenResize` in `calcui/notebook_view.lua` (rebuild keyboard and layout, keep text, cursor, top cell) and the Back key close path when `Device:hasKeys()`; closing returns to the reading session
-- [ ] T046 [US4] Emulator check of US4 scenarios 1-8: save and restart, truncate and empty the file, simulated failed write (read-only settings directory), book `.sdr` checksums before and after, log has no errors; rotation if it can be tested, otherwise state it is unverified in `quickstart.md`
+- [X] T042 [US4] Implement `calcnb/store_logic.lua` and `calcnb/dirty.lua`
+- [X] T043 [US4] Implement `calcui/notebook_store.lua` (`LuaSettings` load/save with `pcall`, `logger.warn`, failure message, keeps notebook dirty on failure, delete with `ConfirmBox`)
+- [X] T044 [US4] Wire Save, autosave on Close and on `onCloseWidget`, problems message on load, restore scroll position, outputs absent after load; Menu items New, Open, Save as map to the single default notebook (or are hidden) per the spec assumption
+- [X] T045 [US4] Implement `onScreenResize` in `calcui/notebook_view.lua` (rebuild keyboard and layout, keep text, cursor, top cell) and the Back key close path when `Device:hasKeys()`; closing returns to the reading session
+- [X] T046 [US4] Emulator check of US4 scenarios 1-8: save and restart, truncate and empty the file, simulated failed write (read-only settings directory), book `.sdr` checksums before and after, log has no errors; rotation if it can be tested, otherwise state it is unverified in `quickstart.md`
 
 ---
 
