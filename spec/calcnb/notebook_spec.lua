@@ -254,3 +254,16 @@ describe("calcnb.notebook running", function()
     assert.are.equal("a+1", nb.cells[1].output.canonical)
   end)
 end)
+
+describe("calcnb.notebook graph viewport", function()
+  it("drops a saved viewport when the source changes but not when it is unchanged", function()
+    local nb = notebook.new("T")
+    local id = nb.cells[1].id
+    nb:set_source(id, "plot(sin(x))")
+    nb.cells[1].viewport = { xmin = -1, xmax = 1, ymin = -1, ymax = 1 }
+    nb:set_source(id, "plot(sin(x))")
+    assert.is_table(nb.cells[1].viewport)
+    nb:set_source(id, "plot(cos(x))")
+    assert.is_nil(nb.cells[1].viewport)
+  end)
+end)

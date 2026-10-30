@@ -9,41 +9,24 @@ local Device = require("device")
 local Font = require("ui/font")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
-local GestureRange = require("ui/gesturerange")
-local InputContainer = require("ui/widget/container/inputcontainer")
 local LineWidget = require("ui/widget/linewidget")
 local TextBoxWidget = require("ui/widget/textboxwidget")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
+local GraphOutput = require("calcui.graph_output")
+local TapArea = require("calcui.tap_area")
 local cell_status = require("calcui.cell_status")
 local guard = require("calcui.guard")
 local _ = require("gettext")
 
 local Screen = Device.screen
 
--- A tappable wrapper around any widget.
-local TapArea = InputContainer:extend{ callback = nil }
-
-function TapArea:init()
-    self.dimen = Geom:new{ w = self[1]:getSize().w, h = self[1]:getSize().h }
-    self.ges_events = {
-        Tap = { GestureRange:new{ ges = "tap", range = function() return self.dimen end } },
-    }
-end
-
-function TapArea:onTap()
-    if self.callback then
-        self.callback()
-    end
-    return true
-end
-
 local CellWidget = VerticalGroup:extend{
     cell = nil,
     width = nil,
     active = false, -- show the editor
     editing = false, -- show the Editing status (same as active today)
-    view = nil, -- { on_edit, on_run, on_menu, on_expand } callbacks taking the cell id
+    view = nil, -- { on_edit, on_run, on_menu, on_expand, on_graph } callbacks taking the cell id
     editor_h = nil,
 }
 
@@ -140,6 +123,14 @@ function CellWidget:init()
             }
         end
     end
+    local out = cell.output
+    if out and out.kind == "graph" then
+        self.graph = GraphOutput:new{
+            cell = cell, width = inner, show_parent = self.show_parent, on_open = view.on_graph,
+        }
+        group[#group + 1] = VerticalSpan:new{ width = Screen:scaleBySize(4) }
+        group[#group + 1] = FrameContainer:new{ bordersize = 0, padding = 0, padding_left = pad, self.graph }
+    end
     group[#group + 1] = VerticalSpan:new{ width = Screen:scaleBySize(6) }
     group[#group + 1] = LineWidget:new{
         dimen = Geom:new{ w = width, h = Screen:scaleBySize(1) },
@@ -149,6 +140,20 @@ function CellWidget:init()
         self[i] = w
     end
     self.align = "left"
+end
+
+-- Starts background work (inline plot) once the widget is known to be shown.
+function CellWidget:start()
+    if self.graph then
+        self.graph:start()
+    end
+end
+
+-- Stops that work and frees buffers; call when the widget is discarded.
+function CellWidget:release()
+    if self.graph then
+        self.graph:release()
+    end
 end
 
 return CellWidget

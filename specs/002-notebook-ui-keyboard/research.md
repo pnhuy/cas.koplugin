@@ -112,8 +112,7 @@ map so several can be added later without a format break.
 
 **Decision**: Inline graph = `calcui/graph_canvas.lua` (001) sized to the cell width, drawn from a plot job started by the
 runner. Tap/Expand opens the existing `graph_view` with the cell's own viewport state. New: Pan ×4 and Zoom ± buttons,
-Axes toggle, equal-scale option. Reuse of `calcplot.viewport` (zoom/pan helpers verified to exist in 001; the plan task list
-re-reads the module before use). Viewport per graph cell is stored in the notebook file; the global 001 viewport setting is
+Axes toggle, equal-scale option. `calcplot.viewport` (re-read in Phase 5) had only `new`, `default`, `to_screen`, `to_math` and `auto_y`; the earlier note that zoom/pan existed was wrong. Phase 5 added `zoom`, `pan`, `equal_scale`, `copy` and `from_table`, with specs. Viewport per graph cell is stored in the notebook file; the global 001 viewport setting is
 used as the default for a new plot.
 
 ## R10. Orientation and resize

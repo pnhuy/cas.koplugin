@@ -23,6 +23,7 @@ local GraphCanvas = Widget:extend{
     vp = nil,
     curves = nil,
     grid = true,
+    axes = true, -- axis lines and tick labels
 }
 
 function GraphCanvas:init()
@@ -32,8 +33,8 @@ function GraphCanvas:init()
 end
 
 -- vp is the viewport actually plotted (auto Y already applied).
-function GraphCanvas:setPicture(vp, curves, grid)
-    self.vp, self.curves, self.grid = vp, curves, grid
+function GraphCanvas:setPicture(vp, curves, grid, axes)
+    self.vp, self.curves, self.grid, self.axes = vp, curves, grid, axes ~= false
     self:free()
 end
 
@@ -61,6 +62,9 @@ function GraphCanvas:_draw_grid_and_labels(buf)
             local _, py = viewport.to_screen(vp, w, h, 0, y)
             buf:paintRect(0, math.floor(py + 0.5), w, 1, Blitbuffer.COLOR_LIGHT_GRAY)
         end
+    end
+    if not self.axes then
+        return
     end
     if vp.ymin <= 0 and vp.ymax >= 0 then
         local _, py = viewport.to_screen(vp, w, h, 0, 0)

@@ -30,13 +30,19 @@ local _ = require("gettext")
 
 local Screen = Device.screen
 
+local unpack = table.unpack or unpack -- luacheck: ignore 143
+
 local STEP_BUDGET = 0.05 -- seconds of plotting per tick
 
 local GraphView = InputContainer:extend{
     name = "calculator_graph",
     state = nil, -- graph session state (calcui.graph_model)
     on_calculator = nil, -- called after closing, to return to the Calculator view
+    notebook = false, -- opened from a notebook cell: no function list, global settings untouched
+    on_close = nil, -- called with the state when the view closes
 }
+
+local ZOOM_IN, ZOOM_OUT, PAN = 0.5, 2, 0.25
 
 function GraphView:init()
     if Device:hasKeys() then
@@ -62,32 +68,55 @@ function GraphView:_build()
         end,
         show_parent = self,
     }
-    self.button_table = ButtonTable:new{
-        width = w,
-        show_parent = self,
-        buttons = {
-            {
-                { text = _("Functions"), callback = guard.wrap(function() self:_functions() end) },
-                { text = _("Range"), callback = guard.wrap(function() self:_range() end) },
-                { text = _("Reset"), callback = guard.wrap(function() self:_reset() end) },
-            },
-            {
-                { text = _("Calculator"), callback = guard.wrap(function() self:_calculator() end) },
-                { text = _("Close"), callback = function() self:onClose() end },
-            },
+    local function action(fn, ...)
+        local args = { ... }
+        return guard.wrap(function() fn(self, unpack(args)) end)
+    end
+    local buttons = {
+        {
+            { text = _("Zoom +"), callback = action(self._zoom, ZOOM_IN) },
+            { text = _("Zoom -"), callback = action(self._zoom, ZOOM_OUT) },
+            { text = "1:1", callback = action(self._equal) },
+            { text = _("Reset"), callback = action(self._reset) },
+        },
+        {
+            { text = "←", callback = action(self._pan, -PAN, 0) },
+            { text = "↑", callback = action(self._pan, 0, PAN) },
+            { text = "↓", callback = action(self._pan, 0, -PAN) },
+            { text = "→", callback = action(self._pan, PAN, 0) },
+        },
+        {
+            { text = _("Range"), callback = action(self._range) },
+            { text = self.state.grid and _("Grid: on") or _("Grid: off"), callback = action(self._toggle, "grid") },
+            { text = self.state.axes ~= false and _("Axes: on") or _("Axes: off"), callback = action(self._toggle, "axes") },
         },
     }
+    if not self.notebook then
+        buttons[#buttons + 1] = {
+            { text = _("Functions"), callback = action(self._functions) },
+            { text = _("Calculator"), callback = action(self._calculator) },
+            { text = _("Close"), callback = function() self:onClose() end },
+        }
+    end
+    self.button_table = ButtonTable:new{ width = w, show_parent = self, buttons = buttons }
     self.status = TextWidget:new{
         text = " ",
         face = Font:getFace("cfont", 16),
         max_width = w - 2 * pad,
     }
+    self.legend = TextWidget:new{
+        text = " ",
+        face = Font:getFace("cfont", 14),
+        max_width = w - 2 * pad,
+    }
     local status_h = self.status:getSize().h
+    local legend_h = self.legend:getSize().h
     local title_h = self.title_bar:getSize().h
-    local canvas_h = h - title_h - self.button_table:getSize().h - status_h - 3 * pad
+    local canvas_h = h - title_h - self.button_table:getSize().h - status_h - legend_h - 4 * pad
     self.canvas = GraphCanvas:new{ width = w - 2 * pad, height = canvas_h }
     self.canvas_region = Geom:new{ x = pad, y = title_h + pad, w = self.canvas.width, h = canvas_h }
     self.status_region = Geom:new{ x = 0, y = title_h + 2 * pad + canvas_h, w = w, h = status_h }
+    self.legend_region = Geom:new{ x = 0, y = title_h + 3 * pad + canvas_h + status_h, w = w, h = legend_h }
     self[1] = FrameContainer:new{
         background = Blitbuffer.COLOR_WHITE,
         bordersize = 0,
@@ -100,6 +129,8 @@ function GraphView:_build()
             self.canvas,
             VerticalSpan:new{ width = pad },
             self.status,
+            VerticalSpan:new{ width = pad },
+            self.legend,
             self.button_table,
         },
     }
@@ -108,6 +139,19 @@ end
 function GraphView:_set_status(text)
     self.status:setText(text)
     UIManager:setDirty(self, "ui", self.status_region)
+end
+
+local function legend_text(state)
+    local parts = {}
+    for _, row in ipairs(model.legend(state)) do
+        parts[#parts + 1] = row.label .. " (" .. row.style .. ")"
+    end
+    return table.concat(parts, ",  ")
+end
+
+function GraphView:_set_legend()
+    self.legend:setText(legend_text(self.state))
+    UIManager:setDirty(self, "ui", self.legend_region)
 end
 
 function GraphView:_cancel_job()
@@ -131,6 +175,7 @@ function GraphView:_replot()
     self._failed = failed
     self.job = calcplot.new(functions, self.state.viewport, w, h)
     self:_set_status(_("Plotting…"))
+    self:_set_legend()
     UIManager:nextTick(self._tick)
 end
 
@@ -150,7 +195,8 @@ function GraphView:_step()
         return
     end
     local used = job:viewport()
-    self.canvas:setPicture(used, job:result(), self.state.grid)
+    self._used = used
+    self.canvas:setPicture(used, job:result(), self.state.grid, self.state.axes)
     self._ready = true
     UIManager:setDirty(self, "ui", self.canvas_region)
     self:_set_status(self:_summary(used))
@@ -170,10 +216,63 @@ function GraphView:_functions()
     end)
 end
 
+-- The classic view remembers its viewport across sessions; a notebook cell
+-- gets it back through on_close.
+function GraphView:_save()
+    if not self.notebook then
+        settings.save(self.state.viewport, self.state.grid)
+    end
+end
+
 function GraphView:_reset()
-    self.state.viewport = viewport.default()
-    settings.save(self.state.viewport, self.state.grid)
+    self.state.viewport = viewport.copy(self.state.home or viewport.default())
+    self:_save()
     self:_replot()
+end
+
+-- Applies a viewport.zoom/pan/equal_scale-style change to what is on screen
+-- (the plotted range, so auto Y is already resolved). Invalid results are
+-- reported and leave the view as it was.
+function GraphView:_apply(change, ...)
+    local current = self.state.viewport
+    local base = viewport.copy(self._used or current)
+    base.auto_y = current.auto_y
+    local new, err = change(base, ...)
+    if not new then
+        self:_set_status(outcome.describe("", err, _))
+        return
+    end
+    self.state.viewport = new
+    self:_save()
+    self:_replot()
+end
+
+function GraphView:_zoom(factor)
+    self:_apply(viewport.zoom, factor)
+end
+
+function GraphView:_pan(fx, fy)
+    self:_apply(viewport.pan, fx, fy)
+end
+
+function GraphView:_equal()
+    self:_apply(viewport.equal_scale, self.canvas.width, self.canvas.height)
+end
+
+-- key: "grid" or "axes". The buttons show the state, so rebuild them.
+function GraphView:_toggle(key)
+    self.state[key] = self.state[key] == false
+    self:_save()
+    self:_rebuild()
+end
+
+function GraphView:_rebuild()
+    self:_cancel_job()
+    self.canvas:free()
+    self._ready = false
+    self:_build()
+    self:_replot()
+    UIManager:setDirty(self, "ui")
 end
 
 local function field_text(v)
@@ -241,8 +340,8 @@ function GraphView:_range(pending)
                         UIManager:close(dialog)
                         self.state.viewport = new_vp
                         self.state.grid = pending.grid
-                        settings.save(self.state.viewport, self.state.grid)
-                        self:_replot()
+                        self:_save()
+                        self:_rebuild()
                     end,
                 },
             },
@@ -262,12 +361,7 @@ end
 
 -- Orientation or window size changed: relayout and redraw at the new size.
 function GraphView:onScreenResize()
-    self:_cancel_job()
-    self.canvas:free()
-    self._ready = false
-    self:_build()
-    self:_replot()
-    UIManager:setDirty(self, "ui")
+    self:_rebuild()
 end
 
 function GraphView:onClose()
@@ -276,16 +370,28 @@ function GraphView:onClose()
 end
 
 function GraphView:onCloseWidget()
-    settings.save(self.state.viewport, self.state.grid)
+    self:_save()
     self:_cancel_job()
     self.canvas:free()
+    if self.on_close then
+        self.on_close(self.state)
+    end
 end
 
 local GraphViewModule = {}
 
 -- state: calcui.graph_model state; on_calculator: optional return hook.
-function GraphViewModule.show(state, on_calculator)
-    UIManager:show(GraphView:new{ state = state, on_calculator = on_calculator })
+-- opts (optional): { on_close = fn(state) } opens the view for a notebook cell.
+function GraphViewModule.show(state, on_calculator, opts)
+    local view = GraphView:new{
+        state = state,
+        on_calculator = on_calculator,
+        notebook = opts ~= nil,
+        on_close = opts and opts.on_close,
+    }
+    UIManager:show(view)
+    -- opened over the notebook: refresh the whole screen, not just the region its first paint marks
+    UIManager:setDirty(view, "ui", Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = Screen:getHeight() })
 end
 
 return GraphViewModule

@@ -3,6 +3,7 @@
 -- { functions = { {id, text, visible, style} }, viewport = {...}, grid = true }.
 
 local calccas = require("calccas")
+local raster = require("calcplot.raster")
 local viewport = require("calcplot.viewport")
 
 local M = {}
@@ -10,7 +11,53 @@ local M = {}
 M.MAX_FUNCTIONS = 6
 
 function M.new_state()
-    return { functions = {}, viewport = viewport.default(), grid = true, next_id = 1 }
+    return { functions = {}, viewport = viewport.default(), grid = true, axes = true, next_id = 1 }
+end
+
+-- State for a notebook plot cell: `graph` is a calcnb graph output
+-- ({functions = {{label, ast}}, x_range = {lo, hi}}), `saved` the viewport
+-- stored on the cell (nil if the user never changed it). `home` is what Reset
+-- returns to.
+function M.from_graph(graph, saved)
+    local range = graph.x_range
+    local home = range and viewport.new(range.lo, range.hi, -10, 10, true)
+    home = home or viewport.default()
+    local state = { functions = {}, viewport = viewport.copy(home), home = home, grid = true, axes = true, next_id = 1 }
+    local restored = saved and viewport.from_table(saved)
+    if restored then
+        state.viewport = restored
+        state.grid = restored.grid ~= false
+        state.axes = restored.axes ~= false
+        restored.grid, restored.axes = nil, nil
+    end
+    for i, f in ipairs(graph.functions) do
+        local entry = { id = state.next_id, label = f.label, text = calccas.tostring(f.ast),
+            visible = true, style = i }
+        entry.fn, entry.error = calccas.compile(f.ast, "x")
+        state.next_id = state.next_id + 1
+        state.functions[i] = entry
+    end
+    return state
+end
+
+-- The viewport to store on the cell: limits plus the grid and axes flags.
+function M.to_viewport(state)
+    local vp = viewport.copy(state.viewport)
+    vp.grid, vp.axes = state.grid, state.axes
+    return vp
+end
+
+-- One row per visible curve: its label and line style name (colour is never
+-- the only cue).
+function M.legend(state)
+    local rows = {}
+    for _, entry in ipairs(state.functions) do
+        if entry.visible then
+            local style = raster.STYLES[entry.style] or raster.STYLES[1]
+            rows[#rows + 1] = { label = entry.label or entry.text, style = style.name }
+        end
+    end
+    return rows
 end
 
 local function find(state, id)
@@ -134,6 +181,7 @@ function M.cache_key(state, w, h)
         string.format("%.17g,%.17g,%.17g,%.17g", vp.xmin, vp.xmax, vp.ymin, vp.ymax),
         tostring(vp.auto_y),
         tostring(state.grid),
+        tostring(state.axes),
         w .. "x" .. h,
     }, ";")
 end

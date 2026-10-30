@@ -18,7 +18,9 @@ local function bad(message)
 end
 
 function M.new(xmin, xmax, ymin, ymax, auto_y)
-    for _, v in ipairs({ xmin, xmax, ymin, ymax }) do
+    local limits = { xmin, xmax, ymin, ymax }
+    for i = 1, 4 do -- not ipairs: a missing limit is nil
+        local v = limits[i]
         if not finite(v) then
             return bad("range values must be finite numbers")
         end
@@ -37,6 +39,67 @@ end
 
 function M.default()
     return { xmin = -10, xmax = 10, ymin = -10, ymax = 10, auto_y = true }
+end
+
+function M.copy(vp)
+    local out = {}
+    for k, v in pairs(vp) do
+        out[k] = v
+    end
+    return out
+end
+
+-- Validates data read from a saved file. Only the four limits, `auto_y` and
+-- the boolean display flags `grid`/`axes` are kept.
+function M.from_table(t)
+    if type(t) ~= "table" then
+        return bad("viewport must be a table")
+    end
+    local vp, err = M.new(t.xmin, t.xmax, t.ymin, t.ymax, t.auto_y)
+    if not vp then
+        return nil, err
+    end
+    for _, flag in ipairs({ "grid", "axes" }) do
+        if type(t[flag]) == "boolean" then
+            vp[flag] = t[flag]
+        end
+    end
+    return vp
+end
+
+-- Rebuilds `vp` with new limits, keeping auto_y and the display flags.
+local function with_limits(vp, xmin, xmax, ymin, ymax, auto_y)
+    local out, err = M.new(xmin, xmax, ymin, ymax, auto_y)
+    if not out then
+        return nil, err
+    end
+    out.grid, out.axes = vp.grid, vp.axes
+    return out
+end
+
+-- factor < 1 zooms in, > 1 zooms out, about the centre.
+function M.zoom(vp, factor)
+    local cx, cy = (vp.xmin + vp.xmax) / 2, (vp.ymin + vp.ymax) / 2
+    local hx, hy = (vp.xmax - vp.xmin) * factor / 2, (vp.ymax - vp.ymin) * factor / 2
+    return with_limits(vp, cx - hx, cx + hx, cy - hy, cy + hy, vp.auto_y)
+end
+
+-- fx, fy: fractions of the span (positive = right / up). A vertical pan turns
+-- auto_y off, otherwise the next plot would undo it.
+function M.pan(vp, fx, fy)
+    local dx, dy = (vp.xmax - vp.xmin) * fx, (vp.ymax - vp.ymin) * fy
+    return with_limits(vp, vp.xmin + dx, vp.xmax + dx, vp.ymin + dy, vp.ymax + dy,
+        vp.auto_y and fy == 0)
+end
+
+-- Keeps the X range and the Y centre; Y gets the same units per pixel as X.
+function M.equal_scale(vp, w, h)
+    if not (finite(w) and finite(h) and w > 0 and h > 0) then
+        return bad("canvas size must be positive")
+    end
+    local half = (vp.xmax - vp.xmin) / w * h / 2
+    local cy = (vp.ymin + vp.ymax) / 2
+    return with_limits(vp, vp.xmin, vp.xmax, cy - half, cy + half, false)
 end
 
 function M.to_screen(vp, w, h, x, y)

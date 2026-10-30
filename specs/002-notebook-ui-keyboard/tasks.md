@@ -107,15 +107,15 @@
 
 ### Tests
 
-- [ ] T034 [P] [US3] Re-read `calcplot/viewport.lua` and list its zoom/pan helpers in `research.md` R9; write failing specs `spec/calcplot/viewport_spec.lua` for any missing helper (zoom about centre, pan by a fraction, equal-scale correction, per-cell viewport round trip)
-- [ ] T035 [P] [US3] Write failing specs `spec/calcui/graph_model_spec.lua` additions: build a graph state from a plot output (functions, x range), validate range edits, equal-scale option
+- [X] T034 [P] [US3] Re-read `calcplot/viewport.lua` and list its zoom/pan helpers in `research.md` R9; write failing specs `spec/calcplot/viewport_spec.lua` for any missing helper (zoom about centre, pan by a fraction, equal-scale correction, per-cell viewport round trip)
+- [X] T035 [P] [US3] Write failing specs `spec/calcui/graph_model_spec.lua` additions: build a graph state from a plot output (functions, x range), validate range edits, equal-scale option
 
 ### Implementation
 
-- [ ] T036 [US3] Add the missing viewport helpers to `calcplot/viewport.lua` (no KOReader requires)
-- [ ] T037 [US3] Implement `calcui/graph_output.lua`: inline canvas sized to cell width using `calcui/graph_canvas.lua`, viewport text, Expand button, plot job stepped from ticks, cached by `graph_model.cache_key`, canvas freed when the cell leaves the viewport
-- [ ] T038 [US3] Extend `calcui/graph_view.lua`: Zoom in/out, Pan x4, Reset, Range (with Auto Y and equal scale), Grid and Axes toggles, legend of plotted functions; on close return the chosen viewport to the cell and restore notebook scroll position
-- [ ] T039 [US3] Emulator check of US3 scenarios 1-9 including `1/x`, `tan(x)`, invalid plot argument, grayscale distinguishability of two curves (screenshot); record in `quickstart.md`
+- [X] T036 [US3] Add the missing viewport helpers to `calcplot/viewport.lua` (no KOReader requires)
+- [X] T037 [US3] Implement `calcui/graph_output.lua`: inline canvas sized to cell width using `calcui/graph_canvas.lua`, viewport text, Expand button, plot job stepped from ticks, cached by `graph_model.cache_key`, canvas freed when the cell leaves the viewport
+- [X] T038 [US3] Extend `calcui/graph_view.lua`: Zoom in/out, Pan x4, Reset, Range (with Auto Y and equal scale), Grid and Axes toggles, legend of plotted functions; on close return the chosen viewport to the cell and restore notebook scroll position
+- [X] T039 [US3] Emulator check of US3 scenarios 1-9 including `1/x`, `tan(x)`, invalid plot argument, grayscale distinguishability of two curves (screenshot); record in `quickstart.md`
 
 ---
 

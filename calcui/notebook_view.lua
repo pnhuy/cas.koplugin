@@ -11,12 +11,15 @@ local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
+local GraphOutput = require("calcui.graph_output")
+local GraphView = require("calcui.graph_view")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local Keyboard = require("calcui.keyboard")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
+local graph_model = require("calcui.graph_model")
 local guard = require("calcui.guard")
 local notebook_layout = require("calcui.notebook_layout")
 local run_queue = require("calcnb.run_queue")
@@ -62,7 +65,16 @@ local function bar(width, buttons)
     return ButtonTable:new{ width = width, sep_width = 0, buttons = { buttons } }
 end
 
+-- Stops inline plots and frees their canvases (page widgets are rebuilt or discarded).
+function NotebookView:release_graphs()
+    for _, widget in ipairs(self.shown or {}) do
+        widget:release()
+    end
+    self.shown = {}
+end
+
 function NotebookView:rebuild()
+    self:release_graphs()
     local nb = self.nb
     local w, h = Screen:getWidth(), Screen:getHeight()
     self.dimen = Geom:new{ w = w, h = h }
@@ -98,11 +110,12 @@ function NotebookView:rebuild()
         self.top = notebook_layout.reveal(hs, self.top, content_h, (nb:index_of(self.active)))
     end
 
-    local page, used
+    local page, used, shown
     local active_index = self.active and nb:index_of(self.active)
     while true do
         page = VerticalGroup:new{ align = "left" }
         used = 0
+        shown = {}
         local shown_active = false
         self.editor = nil
         for i = self.top, count do
@@ -120,6 +133,7 @@ function NotebookView:rebuild()
                     on_run = function(id) self:run_cells({ id }) end,
                     on_menu = function(id) self:show_cell_menu(id) end,
                     on_expand = function(id) self:expand(id) end,
+                    on_graph = function(id) self:open_graph(id) end,
                 },
             }
             local cell_h = widget:getSize().h
@@ -128,6 +142,7 @@ function NotebookView:rebuild()
                 break
             end
             page[#page + 1] = widget
+            shown[#shown + 1] = widget
             used = used + cell_h
             if active then
                 shown_active = true
@@ -141,6 +156,10 @@ function NotebookView:rebuild()
         self.top = self.top + 1
     end
     page[#page + 1] = VerticalSpan:new{ width = math.max(0, content_h - used) }
+    self.shown = shown
+    for _, widget in ipairs(shown) do
+        widget:start()
+    end
 
     local column = VerticalGroup:new{ align = "left", toolbar, page, pagebar }
     if self.active then
@@ -240,6 +259,22 @@ function NotebookView:step()
         self.queue:done()
         self:step()
     end))
+end
+
+-- Full-screen viewer for a plot cell; the viewport the user ends with goes
+-- back to the cell. The page (and so the scroll position) is left as it was.
+function NotebookView:open_graph(id)
+    self:sync()
+    local cell = self.nb:get(id)
+    if not (cell and cell.output and cell.output.graph) then
+        return
+    end
+    GraphView.show(graph_model.from_graph(cell.output.graph, cell.viewport), nil, {
+        on_close = function(state)
+            cell.viewport = graph_model.to_viewport(state)
+            self:rebuild()
+        end,
+    })
 end
 
 function NotebookView:expand(id)
@@ -355,6 +390,8 @@ end
 function NotebookView:close()
     self:sync()
     self.queue:cancel()
+    self:release_graphs()
+    GraphOutput.clear_cache()
     UIManager:close(self)
 end
 

@@ -105,3 +105,102 @@ describe("calcplot.viewport", function()
         end)
     end)
 end)
+
+describe("calcplot.viewport navigation", function()
+    local base = assert(viewport.new(-10, 10, -10, 10))
+
+    it("zooms about the centre", function()
+        local vp = assert(viewport.zoom(base, 0.5))
+        assert.are.same({ -5, 5, -5, 5 }, { vp.xmin, vp.xmax, vp.ymin, vp.ymax })
+        local out = assert(viewport.zoom(base, 2))
+        assert.are.same({ -20, 20, -20, 20 }, { out.xmin, out.xmax, out.ymin, out.ymax })
+    end)
+
+    it("zooms about an off-centre viewport and keeps the auto_y flag", function()
+        local vp = assert(viewport.new(0, 4, 10, 20, true))
+        local z = assert(viewport.zoom(vp, 0.5))
+        assert.are.same({ 1, 3, 12.5, 17.5 }, { z.xmin, z.xmax, z.ymin, z.ymax })
+        assert.is_true(z.auto_y)
+    end)
+
+    it("refuses a zoom that leaves the valid range", function()
+        local vp, err = viewport.zoom(base, 1e-12)
+        assert.is_nil(vp)
+        assert.are.equal("range", err.kind)
+        local big, err2 = viewport.zoom(assert(viewport.new(-5e8, 5e8, -1, 1)), 10)
+        assert.is_nil(big)
+        assert.are.equal("range", err2.kind)
+    end)
+
+    it("pans by a fraction of the span", function()
+        local vp = assert(viewport.pan(base, 0.25, 0))
+        assert.are.same({ -5, 15, -10, 10 }, { vp.xmin, vp.xmax, vp.ymin, vp.ymax })
+        local up = assert(viewport.pan(base, 0, 0.5))
+        assert.are.same({ -10, 10, 0, 20 }, { up.xmin, up.xmax, up.ymin, up.ymax })
+    end)
+
+    it("a horizontal pan keeps auto_y, a vertical pan turns it off", function()
+        local vp = assert(viewport.new(0, 1, 0, 1, true))
+        assert.is_true(assert(viewport.pan(vp, 0.5, 0)).auto_y)
+        assert.is_false(assert(viewport.pan(vp, 0, 0.5)).auto_y)
+    end)
+
+    it("refuses a pan beyond the limits", function()
+        local vp, err = viewport.pan(assert(viewport.new(9e8, 9.5e8, 0, 1)), 10, 0)
+        assert.is_nil(vp)
+        assert.are.equal("range", err.kind)
+    end)
+
+    it("does not modify its input", function()
+        viewport.zoom(base, 0.5)
+        viewport.pan(base, 1, 1)
+        assert.are.same({ -10, 10, -10, 10 }, { base.xmin, base.xmax, base.ymin, base.ymax })
+    end)
+
+    it("equal scale makes one unit the same length on both axes", function()
+        local vp = assert(viewport.equal_scale(base, 400, 200))
+        assert.are.same({ -10, 10, -5, 5 }, { vp.xmin, vp.xmax, vp.ymin, vp.ymax })
+        assert.is_false(vp.auto_y)
+        local tall = assert(viewport.equal_scale(assert(viewport.new(0, 10, 100, 110)), 100, 200))
+        assert.are.same({ 0, 10, 95, 115 }, { tall.xmin, tall.xmax, tall.ymin, tall.ymax })
+    end)
+
+    it("equal scale rejects an impossible canvas", function()
+        local vp, err = viewport.equal_scale(base, 0, 100)
+        assert.is_nil(vp)
+        assert.are.equal("range", err.kind)
+    end)
+end)
+
+describe("calcplot.viewport persistence helpers", function()
+    it("copy is independent and keeps extra flags", function()
+        local vp = assert(viewport.new(-1, 1, -2, 2, true))
+        vp.grid, vp.axes = false, true
+        local c = viewport.copy(vp)
+        assert.are.same(vp, c)
+        c.xmin = 0
+        assert.are.equal(-1, vp.xmin)
+    end)
+
+    it("from_table round-trips a saved viewport", function()
+        local vp = assert(viewport.new(-3, 3, -1, 1, false))
+        vp.grid, vp.axes = false, false
+        assert.are.same(vp, assert(viewport.from_table(viewport.copy(vp))))
+    end)
+
+    it("from_table ignores unknown fields and non-boolean flags", function()
+        local vp = assert(viewport.from_table({ xmin = 0, xmax = 1, ymin = 0, ymax = 1, auto_y = true,
+            grid = "yes", evil = function() end }))
+        assert.is_nil(vp.grid)
+        assert.is_nil(vp.evil)
+    end)
+
+    it("from_table rejects malformed data", function()
+        for _, bad in ipairs({ "x", 5, {}, { xmin = 1, xmax = 0, ymin = 0, ymax = 1 },
+            { xmin = "a", xmax = 1, ymin = 0, ymax = 1 } }) do
+            local vp, err = viewport.from_table(bad)
+            assert.is_nil(vp)
+            assert.are.equal("range", err.kind)
+        end
+    end)
+end)

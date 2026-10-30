@@ -132,3 +132,81 @@ describe("calcui.graph_model", function()
         end)
     end)
 end)
+
+describe("calcui.graph_model notebook graphs", function()
+    local calccas = require("calccas")
+    local function graph(x_range)
+        return {
+            functions = {
+                { label = "sin(x)", ast = assert(calccas.parse("sin(x)")) },
+                { label = "cos(x)", ast = assert(calccas.parse("cos(x)")) },
+            },
+            x_range = x_range,
+        }
+    end
+
+    it("builds a state from a plot output", function()
+        local state = model.from_graph(graph({ lo = -3, hi = 3 }))
+        assert.are.equal(2, #state.functions)
+        assert.are.same({ 1, 2 }, { state.functions[1].style, state.functions[2].style })
+        assert.are.equal("sin(x)", state.functions[1].label)
+        assert.are.equal(calccas.tostring(assert(calccas.parse("sin(x)"))), state.functions[1].text)
+        assert.is_true(state.functions[1].visible)
+        assert.are.same({ -3, 3, true }, { state.viewport.xmin, state.viewport.xmax, state.viewport.auto_y })
+        assert.is_true(state.grid)
+        assert.is_true(state.axes)
+        assert.are.same(state.viewport, state.home)
+    end)
+
+    it("uses the default x range when the plot gives none", function()
+        local state = model.from_graph(graph(nil))
+        assert.are.same({ -10, 10 }, { state.viewport.xmin, state.viewport.xmax })
+    end)
+
+    it("the compiled functions can be plotted", function()
+        local fns, failed = model.plot_functions(model.from_graph(graph(nil)))
+        assert.are.equal(2, #fns)
+        assert.are.equal(0, failed)
+        assert.is_true(math.abs(fns[1].fn(0)) < 1e-12)
+    end)
+
+    it("restores a saved viewport with grid and axes flags", function()
+        local saved = { xmin = -1, xmax = 1, ymin = -2, ymax = 2, auto_y = false, grid = false, axes = false }
+        local state = model.from_graph(graph({ lo = -3, hi = 3 }), saved)
+        assert.are.same({ -1, 1, -2, 2 }, { state.viewport.xmin, state.viewport.xmax, state.viewport.ymin, state.viewport.ymax })
+        assert.is_false(state.grid)
+        assert.is_false(state.axes)
+        assert.are.equal(-3, state.home.xmin)
+    end)
+
+    it("falls back to the plot range when the saved viewport is invalid", function()
+        local state = model.from_graph(graph({ lo = -3, hi = 3 }), { xmin = 5, xmax = 1, ymin = 0, ymax = 1 })
+        assert.are.equal(-3, state.viewport.xmin)
+    end)
+
+    it("to_viewport returns what the cell should store", function()
+        local state = model.from_graph(graph(nil))
+        state.grid, state.axes = false, true
+        state.viewport = assert(require("calcplot.viewport").new(-2, 2, -1, 1))
+        local vp = model.to_viewport(state)
+        assert.are.same({ -2, 2, -1, 1, false, true }, { vp.xmin, vp.xmax, vp.ymin, vp.ymax, vp.grid, vp.axes })
+        local again = model.from_graph(graph(nil), vp)
+        assert.are.same(state.viewport, again.viewport)
+        assert.is_false(again.grid)
+    end)
+
+    it("the cache key changes with the axes option and the plotted expression", function()
+        local state = model.from_graph(graph(nil))
+        local k1 = model.cache_key(state, 300, 200)
+        state.axes = false
+        assert.are_not.equal(k1, model.cache_key(state, 300, 200))
+        local other = model.from_graph({ functions = { { label = "f", ast = assert(calccas.parse("2*x")) } } })
+        local other2 = model.from_graph({ functions = { { label = "f", ast = assert(calccas.parse("3*x")) } } })
+        assert.are_not.equal(model.cache_key(other, 300, 200), model.cache_key(other2, 300, 200))
+    end)
+
+    it("describes each curve for the legend with its line style", function()
+        local legend = model.legend(model.from_graph(graph(nil)))
+        assert.are.same({ { label = "sin(x)", style = "solid" }, { label = "cos(x)", style = "dashed" } }, legend)
+    end)
+end)

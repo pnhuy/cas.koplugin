@@ -195,6 +195,7 @@ function Notebook:set_source(id, text)
     end
     if text ~= cell.source then
         cell.source = text
+        cell.viewport = nil -- a viewport belongs to the plot it was set on
         if cell.output then
             cell.out_of_date = true
         end
